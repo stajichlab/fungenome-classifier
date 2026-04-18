@@ -9,6 +9,16 @@ description = "Phylogeny-aware multi-feature classifier for fungal genomes"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "black",
+    "ruff",
+    "pre-commit",
+    "nbformat",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fungal_classifier*"]
@@ -17,5 +27,13 @@ include = ["fungal_classifier*"]
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (integration tests, deselect with -m 'not slow')",
+]
+addopts = "-v --tb=short"
