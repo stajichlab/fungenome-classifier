@@ -1,0 +1,44 @@
+# Data (large files — store in DVC or S3)
+data/raw/
+data/processed/
+data/features/
+
+# Results (optionally gitignore large result files)
+results/models/
+results/shap/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+
+# Environments
+.venv/
+env/
+.conda/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/

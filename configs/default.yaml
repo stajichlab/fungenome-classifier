@@ -1,0 +1,105 @@
+# configs/default.yaml
+# Default experiment configuration for FungalClassifier
+
+# ── Feature blocks ─────────────────────────────────────────────────────────────
+features:
+  kmer:
+    enabled: true
+    k_values: [1, 2, 3, 4, 5, 6]
+    normalize: relative_abundance   # options: count | relative_abundance | obs_exp
+    sequence_type: genomic          # options: genomic | cds | both
+    window_size: null               # null = whole sequence
+
+  domains:
+    enabled: true
+    database: pfam                  # options: pfam | interpro | both
+    representation: copy_number     # options: binary | copy_number
+    min_genome_freq: 0.01           # drop domains present in < 1% of genomes
+
+  pathways:
+    enabled: true
+    kegg: true
+    go:
+      enabled: true
+      aggregation: slim             # options: full | slim | level2
+    cazyme: true                    # requires dbCAN output
+    bgc: true                       # requires antiSMASH output
+    min_genome_freq: 0.01
+
+  repeats:
+    enabled: true
+    normalize_by: genome_size       # options: genome_size | none
+    classes:                        # RepeatMasker classes to extract
+      - LTR
+      - DNA
+      - LINE
+      - SINE
+      - Simple_repeat
+      - Low_complexity
+      - Unknown
+
+  motifs:
+    enabled: true
+    pwm_database: jaspar_fungi      # options: jaspar_fungi | jaspar_all | custom
+    p_value_threshold: 1.0e-4
+    upstream_bp: 1000               # promoter window upstream of TSS
+
+# ── Feature selection ──────────────────────────────────────────────────────────
+feature_selection:
+  method: variance_threshold        # applied per block before fusion
+  variance_threshold: 0.01
+  univariate_k: 500                 # top-k features per block (null = keep all)
+  univariate_scoring: f_classif     # options: f_classif | mutual_info_classif
+
+# ── Models ─────────────────────────────────────────────────────────────────────
+models:
+  block_classifier:
+    type: xgboost                   # options: xgboost | lightgbm | random_forest
+    xgboost:
+      n_estimators: 500
+      max_depth: 6
+      learning_rate: 0.05
+      subsample: 0.8
+      colsample_bytree: 0.8
+      use_label_encoder: false
+      eval_metric: mlogloss
+      early_stopping_rounds: 50
+
+  fusion:
+    strategy: stacking              # options: concat | stacking | attention
+    meta_learner: logistic_regression
+    use_probabilities: true         # use block prediction probabilities as meta-features
+
+# ── Targets ────────────────────────────────────────────────────────────────────
+targets:
+  - name: taxonomy_order
+    column: taxonomy_order
+    task: multiclass
+  - name: ecological_niche
+    column: ecological_niche
+    task: multiclass
+  - name: lifestyle
+    column: lifestyle
+    task: multiclass
+
+# ── Cross-validation ───────────────────────────────────────────────────────────
+cross_validation:
+  strategy: clade_holdout           # options: clade_holdout | random | stratified
+  n_folds: 10
+  clade_level: order                # phylogenetic level to hold out (family | order | class)
+  random_seed: 42
+  phylo_correction: phylo_eigenvectors  # options: none | phylo_eigenvectors | pgls
+
+# ── Preprocessing ──────────────────────────────────────────────────────────────
+preprocessing:
+  scaler: standard                  # options: standard | minmax | robust | none
+  handle_sparse: truncated_svd      # options: truncated_svd | none
+  svd_components: 200
+  impute_missing: median            # options: median | zero | none
+
+# ── Output ─────────────────────────────────────────────────────────────────────
+output:
+  save_feature_matrices: true
+  save_shap_values: true
+  plot_format: svg
+  log_level: INFO
