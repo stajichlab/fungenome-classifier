@@ -1,0 +1,107 @@
+# configs/deep_fusion.yaml
+# Configuration for PyTorch multi-modal deep fusion model
+
+# ── Feature blocks ─────────────────────────────────────────────────────────────
+features:
+  kmer:
+    enabled: true
+    k_values: [2, 3, 4]            # Smaller k for deep model (SVD will reduce anyway)
+    normalize: obs_exp
+    sequence_type: cds             # CDS composition for codon usage signal
+    window_size: null
+
+  domains:
+    enabled: true
+    database: pfam
+    representation: copy_number
+    min_genome_freq: 0.01
+
+  pathways:
+    enabled: true
+    kegg: true
+    go:
+      enabled: true
+      aggregation: slim
+    cazyme: true
+    bgc: true
+    min_genome_freq: 0.01
+
+  repeats:
+    enabled: true
+    normalize_by: genome_size
+    classes:
+      - LTR
+      - DNA
+      - LINE
+      - SINE
+      - Simple_repeat
+      - Low_complexity
+      - Unknown
+
+  motifs:
+    enabled: true
+    pwm_database: jaspar_fungi
+    p_value_threshold: 1.0e-4
+    upstream_bp: 1000
+
+# ── Feature selection (per block, before tower input) ─────────────────────────
+feature_selection:
+  method: variance_threshold
+  variance_threshold: 0.01
+  univariate_k: 300               # Fewer features per block — towers handle compression
+  univariate_scoring: mutual_info_classif
+
+# ── Preprocessing ──────────────────────────────────────────────────────────────
+preprocessing:
+  scaler: standard
+  handle_sparse: truncated_svd
+  svd_components: 150             # Per-block SVD before tower input
+  impute_missing: median
+
+# ── Deep fusion model ──────────────────────────────────────────────────────────
+models:
+  deep_fusion:
+    hidden_dim: 256               # Hidden units in each block tower
+    embedding_dim: 128            # Output dim of each tower (shared embedding space)
+    fusion: attention             # options: concat | attention
+    dropout: 0.35
+    aux_loss_weight: 0.2          # Weight on per-block auxiliary classification heads
+
+  training:
+    lr: 0.001
+    weight_decay: 0.0001
+    n_epochs: 150
+    batch_size: 64
+    patience: 20                  # Early stopping patience
+    device: auto                  # auto | cpu | cuda
+
+  optimizer: adamw
+  scheduler: cosine               # options: cosine | step | plateau
+
+# ── Targets ────────────────────────────────────────────────────────────────────
+targets:
+  - name: taxonomy_order
+    column: taxonomy_order
+    task: multiclass
+  - name: ecological_niche
+    column: ecological_niche
+    task: multiclass
+  - name: lifestyle
+    column: lifestyle
+    task: multiclass
+
+# ── Cross-validation ───────────────────────────────────────────────────────────
+cross_validation:
+  strategy: clade_holdout
+  n_folds: 10
+  clade_level: order
+  random_seed: 42
+  phylo_correction: phylo_eigenvectors
+
+# ── Output ─────────────────────────────────────────────────────────────────────
+output:
+  save_feature_matrices: true
+  save_attention_weights: true    # Save learned block attention weights per genome
+  save_embeddings: true           # Save tower embeddings for downstream analysis (UMAP etc.)
+  plot_format: svg
+  log_level: INFO

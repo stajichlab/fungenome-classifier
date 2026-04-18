@@ -28,6 +28,7 @@ from fungal_classifier.features.pathways import (
     build_kegg_matrix, build_cazyme_matrix, build_bgc_matrix, build_go_matrix
 )
 from fungal_classifier.features.repeats import build_repeat_matrix
+from fungal_classifier.features.motifs import build_motif_matrix_from_genomes
 from fungal_classifier.utils.io import (
     discover_genome_files, discover_annotation_files,
     load_metadata, save_feature_matrix
@@ -47,7 +48,7 @@ def parse_args():
     p.add_argument("--metadata", type=Path, help="Metadata TSV file (optional, for genome ID filtering)")
     p.add_argument("--output-dir", type=Path, default=Path("data/features"), help="Output directory")
     p.add_argument("--config", type=Path, default=Path("configs/default.yaml"), help="Config YAML")
-    p.add_argument("--blocks", nargs="+", default=["kmer", "domains", "pathways", "repeats"],
+    p.add_argument("--blocks", nargs="+", default=["kmer", "domains", "pathways", "repeats", "motifs"],
                    help="Which feature blocks to build")
     p.add_argument("--n-jobs", type=int, default=4, help="Parallel jobs")
     p.add_argument("--format", choices=["parquet", "hdf5"], default="parquet")
@@ -175,6 +176,45 @@ def main():
             )
         else:
             logger.warning("No RepeatMasker .out files found — skipping repeat features")
+
+    # ── motif features ───────────────────────────────────────────────────────
+    if "motifs" in args.blocks:
+        motif_cfg = config["features"]["motifs"]
+        pwm_db = args.annotation_dir / "jaspar" / "JASPAR2024_CORE_fungi_non-redundant_pfms_meme.txt"
+
+        if not pwm_db.exists():
+            logger.warning(
+                f"JASPAR PWM database not found at {pwm_db}. "
+                "Download with:\n"
+                "  wget https://jaspar.elixir.lu/download/data/2024/CORE/"
+                "JASPAR2024_CORE_fungi_non-redundant_pfms_meme.txt "
+                f"-O {pwm_db}\n"
+                "Skipping motif features."
+            )
+        else:
+            gff_paths = discover_annotation_files(
+                args.annotation_dir / "gff",
+                suffix=".gff3",
+                genome_ids=list(genome_paths.keys()),
+            )
+            if gff_paths:
+                logger.info(f"Building motif feature matrix for {len(gff_paths)} genomes...")
+                motif_matrix = build_motif_matrix_from_genomes(
+                    genome_fastas={gid: genome_paths[gid] for gid in gff_paths},
+                    gff_paths=gff_paths,
+                    pwm_database=pwm_db,
+                    work_dir=args.annotation_dir / "fimo_work",
+                    upstream_bp=motif_cfg["upstream_bp"],
+                    p_value_threshold=motif_cfg["p_value_threshold"],
+                    n_jobs=args.n_jobs,
+                )
+                save_feature_matrix(
+                    motif_matrix,
+                    args.output_dir / f"motifs.{args.format}",
+                    format=args.format,
+                )
+            else:
+                logger.warning("No GFF3 files found — skipping motif features")
 
     logger.info(f"\nAll feature matrices saved to: {args.output_dir}")
 

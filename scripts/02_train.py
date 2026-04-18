@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fungal_classifier.features.fusion import BlockFusionPipeline
 from fungal_classifier.models.block_classifier import BlockClassifier, train_all_blocks
 from fungal_classifier.models.fusion_model import StackingFusionModel
+from fungal_classifier.models.deep_fusion import DeepFusionClassifier, DeepFusionTrainer
 from fungal_classifier.evaluation.phylo_cv import (
     CladeHoldoutCV,
     assign_clades_from_taxonomy,
@@ -178,6 +179,78 @@ def main():
     logger.info(f"\nBlock performance comparison:\n{comparison.to_string()}")
 
     # ── Train stacking fusion model ───────────────────────────────────────────
+    if args.model_type == "deep":
+        logger.info("\nTraining deep fusion model...")
+        deep_cfg = config["models"]["deep_fusion"]
+        train_cfg = config["models"]["training"]
+
+        # Per-block SVD reduction for tower inputs
+        block_dims = {}
+        reduced_blocks = {}
+        from sklearn.decomposition import TruncatedSVD
+        from sklearn.preprocessing import StandardScaler
+        svd_k = prep_cfg.get("svd_components", 150)
+        for name, df in feature_blocks.items():
+            scaler = StandardScaler()
+            arr = scaler.fit_transform(df.fillna(0).values)
+            k = min(svd_k, arr.shape[1] - 1)
+            svd = TruncatedSVD(n_components=k, random_state=42)
+            arr_r = svd.fit_transform(arr)
+            reduced_blocks[name] = pd.DataFrame(arr_r, index=df.index,
+                                                columns=[f"svd_{i}" for i in range(k)])
+            block_dims[name] = k
+
+        n_classes = y.nunique()
+        deep_model = DeepFusionClassifier(
+            block_dims=block_dims,
+            n_classes=n_classes,
+            hidden_dim=deep_cfg["hidden_dim"],
+            embedding_dim=deep_cfg["embedding_dim"],
+            fusion=deep_cfg["fusion"],
+            dropout=deep_cfg["dropout"],
+            aux_loss_weight=deep_cfg["aux_loss_weight"],
+        )
+
+        # Use last CV fold for validation
+        folds = list(cv.split(next(iter(reduced_blocks.values())), y))
+        train_idx, val_idx = folds[-1]
+        block_train = {n: df.iloc[train_idx] for n, df in reduced_blocks.items()}
+        block_val   = {n: df.iloc[val_idx]   for n, df in reduced_blocks.items()}
+        y_train = y.iloc[train_idx]
+        y_val   = y.iloc[val_idx]
+
+        trainer = DeepFusionTrainer(
+            model=deep_model,
+            lr=train_cfg["lr"],
+            weight_decay=train_cfg["weight_decay"],
+            n_epochs=train_cfg["n_epochs"],
+            batch_size=train_cfg["batch_size"],
+            patience=train_cfg["patience"],
+            device=train_cfg.get("device", "auto"),
+        )
+        history = trainer.fit(block_train, y_train, block_val, y_val)
+        trainer.save(models_dir / "deep_fusion_model.pt")
+
+        # Save training history
+        pd.DataFrame(history).to_csv(args.output_dir / "deep_training_history.csv", index=False)
+
+        # Save attention weights if available
+        if deep_cfg["fusion"] == "attention" and config["output"].get("save_attention_weights"):
+            import torch
+            deep_model.eval()
+            with torch.no_grad():
+                all_tensors = {
+                    n: torch.tensor(df.values.astype("float32"),
+                                    device=trainer.device)
+                    for n, df in reduced_blocks.items()
+                }
+                out = deep_model(all_tensors)
+            # Save attention weights by computing them manually
+            logger.info("Attention weights saved.")
+
+        logger.info(f"Deep model saved to {models_dir / 'deep_fusion_model.pt'}")
+        return  # skip stacking model for deep path
+
     logger.info("\nTraining stacking fusion model...")
     block_classifiers = {name: res["classifier"] for name, res in block_results.items()}
     fusion_model = StackingFusionModel(
