@@ -108,18 +108,52 @@ def parse_dbcan_output(path: Path, min_tools: int = 2) -> pd.Series:
         return pd.Series(dtype=float)
 
 
+def parse_dbcan_substrate(path: Path) -> pd.Series:
+    """
+    Parse dbCAN substrate prediction file (substrate.out from dbCAN-sub).
+
+    Returns Series: substrate_<class> -> count of genes predicted for that substrate.
+    """
+    try:
+        df = pd.read_csv(path, sep="\t")
+        df.columns = [c.strip() for c in df.columns]
+        substrate_col = next((c for c in df.columns if "substrate" in c.lower()), None)
+        if substrate_col is None:
+            logger.warning(f"No substrate column in {path}; columns: {list(df.columns)}")
+            return pd.Series(dtype=float)
+        substrates = df[substrate_col].dropna().str.strip()
+        substrates = substrates[substrates != "-"]
+        counts = substrates.value_counts().rename_axis("substrate").rename("count")
+        return counts.rename(index=lambda x: f"substrate_{x}")
+    except Exception as e:
+        logger.warning(f"Failed to parse dbCAN substrate file {path}: {e}")
+        return pd.Series(dtype=float)
+
+
 def build_cazyme_matrix(
     annotation_paths: dict[str, Path],
+    substrate_paths: dict[str, Path] | None = None,
     min_tools: int = 2,
     min_genome_freq: float = 0.01,
 ) -> pd.DataFrame:
-    """Build genome × CAZyme-family feature matrix."""
+    """Build genome × CAZyme-family feature matrix, optionally with substrate predictions."""
     rows = {
         gid: parse_dbcan_output(path, min_tools)
         for gid, path in tqdm(annotation_paths.items(), desc="CAZyme features")
     }
     matrix = pd.DataFrame(rows).T.fillna(0.0).astype(np.float32)
     matrix.index.name = "genome_id"
+
+    if substrate_paths:
+        sub_rows = {
+            gid: parse_dbcan_substrate(path)
+            for gid, path in tqdm(substrate_paths.items(), desc="CAZyme substrate features")
+        }
+        sub_matrix = pd.DataFrame(sub_rows).T.fillna(0.0).astype(np.float32)
+        sub_matrix.index.name = "genome_id"
+        matrix = matrix.join(sub_matrix, how="outer").fillna(0.0).astype(np.float32)
+        logger.info(f"Merged substrate predictions from {len(substrate_paths)} genomes")
+
     freq = (matrix > 0).mean(axis=0)
     matrix = matrix.loc[:, freq >= min_genome_freq]
     logger.info(f"CAZyme matrix: {matrix.shape}")

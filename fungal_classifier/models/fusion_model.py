@@ -61,7 +61,6 @@ class StackingFusionModel:
                 random_state=self.random_seed,
                 C=1.0,
                 solver="lbfgs",
-                multi_class="multinomial",
             )
         elif self.meta_learner == "xgboost":
             import xgboost as xgb

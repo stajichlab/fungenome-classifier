@@ -55,6 +55,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Annotation subdirectories: `tmhmm/`, `signalp/`, `wolfpsort/`, `targetp/`, `aiupred/`, `merops/`, `cds/`
 - `configs/default.yaml`: added `subcellular`, `disorder`, `proteases`, and `composition` sections with tunable thresholds and filters
 
+**dbCAN substrate prediction support**
+- `features/pathways.py`: added `parse_dbcan_substrate()` to parse dbCAN-sub `substrate.out` files; extracts per-genome substrate-class gene counts prefixed with `substrate_` (e.g. `substrate_cellulose`)
+- `features/pathways.py`: `build_cazyme_matrix()` accepts an optional `substrate_paths` dict; substrate features are joined into the CAZyme matrix before frequency filtering
+- `scripts/01_build_features.py`: automatically discovers `substrate.out` files in `data/raw/annotations/dbcan/` alongside `overview.txt` and passes them to `build_cazyme_matrix`
+- `utils/io.py`: `discover_annotation_files()` now falls back to the parent directory name as `genome_id` when the file name alone yields an empty stem — supports per-genome subdirectory layouts used by dbCAN3 (e.g. `dbcan/{genome_id}/overview.txt` and `dbcan/{genome_id}/substrate.out`)
+
 ### Planned
 - Multi-label classification for genomes spanning multiple niches
 - Active learning module for sequencing prioritisation

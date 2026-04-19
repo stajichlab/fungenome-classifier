@@ -165,15 +165,24 @@ def main():
         pw_cfg = config["features"]["pathways"]
 
         if pw_cfg.get("cazyme"):
+            dbcan_dir = args.annotation_dir / "dbcan"
             cazyme_paths = discover_annotation_files(
-                args.annotation_dir / "dbcan",
+                dbcan_dir,
                 suffix="overview.txt",
                 genome_ids=list(genome_paths.keys()),
             )
+            substrate_paths = discover_annotation_files(
+                dbcan_dir,
+                suffix="substrate.out",
+                genome_ids=list(genome_paths.keys()),
+            )
+            if substrate_paths:
+                logger.info(f"Found {len(substrate_paths)} dbCAN substrate files")
             if cazyme_paths:
                 logger.info(f"Building CAZyme matrix from {len(cazyme_paths)} files...")
                 cazyme_matrix = build_cazyme_matrix(
                     annotation_paths=cazyme_paths,
+                    substrate_paths=substrate_paths or None,
                     min_genome_freq=pw_cfg["min_genome_freq"],
                 )
                 save_feature_matrix(

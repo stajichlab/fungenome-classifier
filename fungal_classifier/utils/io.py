@@ -189,7 +189,18 @@ def load_feature_blocks(
 
 def discover_genome_files(
     genome_dir: Path,
-    extensions: tuple[str, ...] = (".fna", ".fa", ".fasta", ".fna.gz"),
+    extensions: tuple[str, ...] = (
+        ".scaffolds.fa",
+        ".scaffolds.fa.gz",
+        ".scaffolds.fasta",
+        ".scaffolds.fna",
+        ".fna.gz",
+        ".fna",
+        ".fa.gz",
+        ".fa",
+        ".fasta.gz",
+        ".fasta",
+    ),
 ) -> dict[str, Path]:
     """
     Discover genome FASTA files in a directory.
@@ -226,7 +237,10 @@ def discover_annotation_files(
         for path in sorted(annotation_dir.rglob(pattern)):
             name = path.name[:-3] if path.name.endswith(".gz") else path.name
             if name.endswith(bare_suffix):
-                genome_id = name[: -len(bare_suffix)].rstrip("._")
+                stem = name[: -len(bare_suffix)].rstrip("._")
+                # Fall back to parent directory name when file is inside a per-genome subdir
+                # (e.g. dbcan/{genome_id}/overview.txt)
+                genome_id = stem if stem else path.parent.name
             else:
                 continue
             if genome_ids is None or genome_id in genome_ids:

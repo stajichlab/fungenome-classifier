@@ -152,7 +152,7 @@ python scripts/04_predict.py \
 |---|---|---|---|
 | `kmer` | k-mer frequencies k=1–6, obs/expected ratios | genome FASTA | — |
 | `domains` | Pfam/InterPro domain copy numbers | `pfam/*.domtblout[.gz]` | hmmer, pfam_scan |
-| `pathways` | KEGG KO counts, GO terms, CAZyme profiles, BGC types | `kegg/`, `dbcan/`, `antismash/` | KEGG, dbCAN, antiSMASH |
+| `pathways` | KEGG KO counts, GO terms, CAZyme family profiles, substrate predictions, BGC types | `kegg/`, `dbcan/`, `antismash/` | KEGG, dbCAN/dbCAN-sub, antiSMASH |
 | `repeats` | TE class proportions, mean divergence per class | `repeatmasker/*.out[.gz]` | RepeatMasker |
 | `motifs` | Promoter motif enrichment scores | `gff/*.gff3`, JASPAR PWMs | FIMO, bedtools |
 | `subcellular` | TM helix counts, signal peptide fraction, compartment fractions, targeting probabilities | `tmhmm/`, `signalp/`, `wolfpsort/`, `targetp/` | TMHMM2, SignalP-6, WolfPSORT, TargetP-2 |
@@ -168,6 +168,9 @@ All annotation files are auto-discovered in gzip-compressed (`.gz`) or uncompres
 data/raw/annotations/
 ├── pfam/            # hmmscan domtblout:       {genome_id}.domtblout[.gz]
 ├── dbcan/           # dbCAN overview:           {genome_id}_overview.txt[.gz]
+│                    # dbCAN-sub substrate:      {genome_id}_substrate.out[.gz]
+│                    # (or per-genome subdirs:   dbcan/{genome_id}/overview.txt
+│                    #                           dbcan/{genome_id}/substrate.out)
 ├── antismash/       # antiSMASH JSON:           {genome_id}.json[.gz]
 ├── repeatmasker/    # RepeatMasker out:         {genome_id}.out[.gz]
 ├── gff/             # Gene annotations:         {genome_id}.gff3[.gz]
