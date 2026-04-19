@@ -109,11 +109,19 @@ def test_concat_fusion_handles_missing_genomes():
 
 # ── dbCAN parsing tests ───────────────────────────────────────────────────────
 
-_OVERVIEW_TSV = (
+_OVERVIEW_TSV_OLD = (
     "Gene ID\tEC#\tHMMER\tHotpep\tDIAMOND\t#ofTools\tCAZyme\n"
     "gene1\t-\tGH5\t-\tGH5\t2\tGH5\n"
     "gene2\t-\tCBM1\t-\t-\t1\tCBM1\n"
     "gene3\t-\tGH18\tGH18\tGH18\t3\tGH18\n"
+)
+
+# dbCAN3 format: cazyme_fam column with position info and sub-families
+_OVERVIEW_TSV = (
+    "Gene_ID\tEC\tcazyme_fam\tsub_fam\tdiamond_fam\tSubstrate\t#ofTools\n"
+    "gene1\t-\tGH5_7(54-357)\tGH5_e260\t-\tbeta-mannan\t2\n"
+    "gene2\t-\tCBM1(1-50)\tCBM1_e1\t-\t-\t1\n"
+    "gene3\t-\tGH18(21-300)\tGH18_e5\t-\tchitin\t3\n"
 )
 
 _SUBSTRATE_TSV = (
@@ -133,67 +141,69 @@ def _write_gz(tmp_path: Path, name: str, content: str) -> Path:
     return p
 
 
-def test_parse_dbcan_output_plain(tmp_path):
-    p = _write_plain(tmp_path, "genomeA_overview.txt", _OVERVIEW_TSV)
+def test_parse_dbcan_output_new_format(tmp_path):
+    p = _write_plain(tmp_path, "overview.tsv", _OVERVIEW_TSV)
     counts = parse_dbcan_output(p, min_tools=2)
-    assert counts["GH5"] == 1
+    assert counts["GH5_7"] == 1
     assert counts["GH18"] == 1
     assert "CBM1" not in counts  # only 1 tool, filtered out
 
 
-def test_parse_dbcan_output_gz(tmp_path):
-    p = _write_gz(tmp_path, "genomeA_overview.txt.gz", _OVERVIEW_TSV)
+def test_parse_dbcan_output_old_format(tmp_path):
+    p = _write_plain(tmp_path, "overview.tsv", _OVERVIEW_TSV_OLD)
     counts = parse_dbcan_output(p, min_tools=2)
     assert counts["GH5"] == 1
     assert counts["GH18"] == 1
     assert "CBM1" not in counts
 
 
+def test_parse_dbcan_output_gz(tmp_path):
+    p = _write_gz(tmp_path, "overview.tsv.gz", _OVERVIEW_TSV)
+    counts = parse_dbcan_output(p, min_tools=2)
+    assert counts["GH5_7"] == 1
+    assert counts["GH18"] == 1
+    assert "CBM1" not in counts
+
+
 def test_parse_dbcan_substrate_plain(tmp_path):
-    p = _write_plain(tmp_path, "genomeA_substrate.out", _SUBSTRATE_TSV)
+    p = _write_plain(tmp_path, "substrates.tsv", _SUBSTRATE_TSV)
     counts = parse_dbcan_substrate(p)
     assert counts["substrate_chitin"] == 2
     assert counts["substrate_cellulose"] == 1
 
 
 def test_parse_dbcan_substrate_gz(tmp_path):
-    p = _write_gz(tmp_path, "genomeA_substrate.out.gz", _SUBSTRATE_TSV)
+    p = _write_gz(tmp_path, "substrates.tsv.gz", _SUBSTRATE_TSV)
     counts = parse_dbcan_substrate(p)
     assert counts["substrate_chitin"] == 2
     assert counts["substrate_cellulose"] == 1
 
 
-def test_discover_dbcan_flat_gz(tmp_path):
-    """Flat layout: {genome_id}_overview.txt.gz"""
-    _write_gz(tmp_path, "genomeA_overview.txt.gz", _OVERVIEW_TSV)
-    _write_gz(tmp_path, "genomeB_overview.txt.gz", _OVERVIEW_TSV)
-    paths = discover_annotation_files(tmp_path, suffix="overview.txt")
-    assert set(paths.keys()) == {"genomeA", "genomeB"}
-
-
 def test_discover_dbcan_subdir_gz(tmp_path):
-    """Per-genome subdir layout: dbcan/{genome_id}/overview.txt.gz"""
+    """Per-genome subdir layout: dbcan/{genome_id}/overview.tsv.gz"""
     for gid in ("genomeA", "genomeB"):
         subdir = tmp_path / gid
         subdir.mkdir()
-        _write_gz(subdir, "overview.txt.gz", _OVERVIEW_TSV)
-    paths = discover_annotation_files(tmp_path, suffix="overview.txt")
+        _write_gz(subdir, "overview.tsv.gz", _OVERVIEW_TSV)
+    paths = discover_annotation_files(tmp_path, suffix="overview.tsv")
     assert set(paths.keys()) == {"genomeA", "genomeB"}
 
 
 def test_discover_dbcan_subdir_substrate_gz(tmp_path):
-    """Per-genome subdir layout: dbcan/{genome_id}/substrate.out.gz"""
+    """Per-genome subdir layout: dbcan/{genome_id}/substrates.tsv.gz"""
     for gid in ("genomeA", "genomeB"):
         subdir = tmp_path / gid
         subdir.mkdir()
-        _write_gz(subdir, "substrate.out.gz", _SUBSTRATE_TSV)
-    paths = discover_annotation_files(tmp_path, suffix="substrate.out")
+        _write_gz(subdir, "substrates.tsv.gz", _SUBSTRATE_TSV)
+    paths = discover_annotation_files(tmp_path, suffix="substrates.tsv")
     assert set(paths.keys()) == {"genomeA", "genomeB"}
 
 
 def test_discover_dbcan_uncompressed_takes_priority(tmp_path):
     """Uncompressed file should win over .gz when both exist."""
-    plain = _write_plain(tmp_path, "genomeA_overview.txt", _OVERVIEW_TSV)
-    _write_gz(tmp_path, "genomeA_overview.txt.gz", _OVERVIEW_TSV)
-    paths = discover_annotation_files(tmp_path, suffix="overview.txt")
+    subdir = tmp_path / "genomeA"
+    subdir.mkdir()
+    plain = _write_plain(subdir, "overview.tsv", _OVERVIEW_TSV)
+    _write_gz(subdir, "overview.tsv.gz", _OVERVIEW_TSV)
+    paths = discover_annotation_files(tmp_path, suffix="overview.tsv")
     assert paths["genomeA"] == plain

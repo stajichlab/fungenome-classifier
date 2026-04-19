@@ -86,22 +86,27 @@ def build_kegg_matrix(
 
 def parse_dbcan_output(path: Path, min_tools: int = 2) -> pd.Series:
     """
-    Parse dbCAN overview.txt output.
+    Parse dbCAN overview TSV (v3+) or legacy overview.txt.
 
-    Columns: Gene ID, EC#, HMMER, Hotpep, DIAMOND, Signalp, #ofTools, CAZyme family.
+    New format columns: Gene_ID, EC, cazyme_fam, sub_fam, diamond_fam, Substrate, #ofTools
+    Old format columns: Gene ID, EC#, HMMER, Hotpep, DIAMOND, Signalp, #ofTools, CAZyme family
+
     Filters to annotations supported by >= min_tools tools.
     Returns Series: cazyme_family -> count.
     """
     try:
         df = pd.read_csv(path, sep="\t")
         df.columns = [c.strip() for c in df.columns]
-        # Filter by number of supporting tools
         df = df[df["#ofTools"] >= min_tools]
-        # The last column is the predicted CAZyme family
-        family_col = df.columns[-1]
-        # Families may be semicolon-delimited (e.g. "GH5;CBM1")
+        # New dbCAN3 format uses an explicit cazyme_fam column;
+        # old format put the family in the last column.
+        if "cazyme_fam" in df.columns:
+            family_col = "cazyme_fam"
+        else:
+            family_col = df.columns[-1]
+        # Families may be semicolon-delimited and carry position info, e.g. "GH5_7(54-357)"
         families = df[family_col].dropna().str.split(";").explode()
-        families = families.str.strip().str.extract(r"([A-Z]+\d+)")[0].dropna()
+        families = families.str.strip().str.extract(r"([A-Z]+\d+(?:_\d+)?)")[0].dropna()
         return families.value_counts().rename("count").rename_axis("cazyme_family")
     except Exception as e:
         logger.warning(f"Failed to parse dbCAN file {path}: {e}")

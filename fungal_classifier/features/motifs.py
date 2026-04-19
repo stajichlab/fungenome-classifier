@@ -35,6 +35,47 @@ logger = logging.getLogger(__name__)
 # ── upstream sequence extraction ──────────────────────────────────────────────
 
 
+def _build_genome_sizes(fai_path: Path) -> Path:
+    """
+    Write a 2-column chrom-sizes file from a samtools .fai index.
+
+    bedtools flank requires chrom\\tlength; .fai has 5 columns.
+    Returns path to a temporary sizes file (caller must unlink).
+    """
+    if not fai_path.exists():
+        raise FileNotFoundError(
+            f"Genome index not found: {fai_path}\n"
+            f"Generate it with: samtools faidx {fai_path.with_suffix('')}"
+        )
+    tmp = tempfile.NamedTemporaryFile(suffix=".sizes", delete=False, mode="w")
+    with open(fai_path) as fh:
+        for line in fh:
+            parts = line.split("\t")
+            tmp.write(f"{parts[0]}\t{parts[1]}\n")
+    tmp.close()
+    return Path(tmp.name)
+
+
+def _filter_gff_by_feature(gff_path: Path, feature_type: str) -> Path:
+    """
+    Write a temp GFF containing only rows whose type column matches feature_type.
+
+    Handles plain and .gz input. Returns path to temp file (caller must unlink).
+    """
+    opener = gzip.open if str(gff_path).endswith(".gz") else open
+    tmp = tempfile.NamedTemporaryFile(suffix=".gff", delete=False, mode="w")
+    with opener(gff_path, "rt") as fh:
+        for line in fh:
+            if line.startswith("#"):
+                tmp.write(line)
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 3 and parts[2] == feature_type:
+                tmp.write(line)
+    tmp.close()
+    return Path(tmp.name)
+
+
 def extract_upstream_sequences(
     genome_fasta: Path,
     gff_path: Path,
@@ -45,12 +86,12 @@ def extract_upstream_sequences(
     """
     Extract upstream (promoter) sequences for all genes using bedtools.
 
-    Requires: bedtools in PATH.
+    Requires: bedtools in PATH, samtools faidx index alongside genome_fasta.
 
     Parameters
     ----------
-    genome_fasta : Path to genome FASTA.
-    gff_path     : Path to GFF3/GTF annotation.
+    genome_fasta : Path to genome FASTA (must have a .fai index beside it).
+    gff_path     : Path to GFF3/GTF annotation (plain or .gz).
     upstream_bp  : Bases upstream of TSS to extract.
     output_fasta : Output path (tmp file if None).
     feature_type : GFF feature type to use as TSS anchor (default: 'gene').
@@ -64,21 +105,22 @@ def extract_upstream_sequences(
         output_fasta = Path(tmp.name)
         tmp.close()
 
-    # Step 1: Extract gene features and compute upstream windows
+    sizes_path = _build_genome_sizes(Path(f"{genome_fasta}.fai"))
+    gff_filtered = _filter_gff_by_feature(gff_path, feature_type)
+
     cmd_flank = [
         "bedtools",
         "flank",
         "-i",
-        str(gff_path),
+        str(gff_filtered),
         "-g",
-        f"{genome_fasta}.fai",  # requires samtools faidx genome.fasta first
+        str(sizes_path),
         "-l",
         str(upstream_bp),
         "-r",
         "0",
-        "-s",  # strand-aware
+        "-s",
     ]
-
     cmd_getfasta = [
         "bedtools",
         "getfasta",
@@ -86,7 +128,7 @@ def extract_upstream_sequences(
         str(genome_fasta),
         "-bed",
         "stdin",
-        "-s",  # strand-aware
+        "-s",
         "-name",
         "-fo",
         str(output_fasta),
@@ -99,7 +141,11 @@ def extract_upstream_sequences(
         )
         p1.stdout.close()
         _, err2 = p2.communicate()
+        err1 = p1.stderr.read()
+        p1.wait()
 
+        if p1.returncode != 0:
+            raise RuntimeError(f"bedtools flank failed: {err1.decode()}")
         if p2.returncode != 0:
             raise RuntimeError(f"bedtools getfasta failed: {err2.decode()}")
 
@@ -108,6 +154,9 @@ def extract_upstream_sequences(
         raise EnvironmentError(
             "bedtools not found in PATH. Install with: conda install -c bioconda bedtools"
         )
+    finally:
+        sizes_path.unlink(missing_ok=True)
+        gff_filtered.unlink(missing_ok=True)
 
     return output_fasta
 
@@ -158,6 +207,8 @@ def run_fimo(
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"FIMO failed: {result.stderr}")
+        # --text writes TSV to stdout rather than to a file
+        fimo_tsv.write_text(result.stdout)
     except FileNotFoundError:
         raise EnvironmentError(
             "fimo not found in PATH. Install MEME Suite: https://meme-suite.org/meme/doc/install.html"

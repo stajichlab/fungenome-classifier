@@ -167,10 +167,8 @@ All annotation files are auto-discovered in gzip-compressed (`.gz`) or uncompres
 ```
 data/raw/annotations/
 ├── pfam/            # hmmscan domtblout:       {genome_id}.domtblout[.gz]
-├── dbcan/           # dbCAN overview:           {genome_id}_overview.txt[.gz]
-│                    # dbCAN-sub substrate:      {genome_id}_substrate.out[.gz]
-│                    # (or per-genome subdirs:   dbcan/{genome_id}/overview.txt
-│                    #                           dbcan/{genome_id}/substrate.out)
+├── dbcan/           # per-genome subdirs:        dbcan/{genome_id}/overview.tsv[.gz]
+│                    #                           dbcan/{genome_id}/substrates.tsv[.gz]
 ├── antismash/       # antiSMASH JSON:           {genome_id}.json[.gz]
 ├── repeatmasker/    # RepeatMasker out:         {genome_id}.out[.gz]
 ├── gff/             # Gene annotations:         {genome_id}.gff3[.gz]

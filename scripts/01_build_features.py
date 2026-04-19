@@ -168,12 +168,12 @@ def main():
             dbcan_dir = args.annotation_dir / "dbcan"
             cazyme_paths = discover_annotation_files(
                 dbcan_dir,
-                suffix="overview.txt",
+                suffix="overview.tsv",
                 genome_ids=list(genome_paths.keys()),
             )
             substrate_paths = discover_annotation_files(
                 dbcan_dir,
-                suffix="substrate.out",
+                suffix="substrates.tsv",
                 genome_ids=list(genome_paths.keys()),
             )
             if substrate_paths:
@@ -404,26 +404,21 @@ def main():
     # ── genomic size features (genome length, N50, protein lengths) ──────────
     if "genomic" in args.blocks:
         prot_dir = args.annotation_dir / "proteins"
-        protein_fasta_paths = (
-            discover_annotation_files(
-                prot_dir,
-                suffix=".faa",
-                genome_ids=list(genome_paths.keys()),
-            )
-            if prot_dir.exists()
-            else {}
-        )
-        # Also check .pep and .aa extensions as fallbacks
-        if not protein_fasta_paths:
-            for ext in (".pep", ".aa", ".faa.gz", ".pep.gz"):
-                protein_fasta_paths = (
-                    discover_annotation_files(
-                        prot_dir,
-                        suffix=ext,
-                        genome_ids=list(genome_paths.keys()),
-                    )
-                    if prot_dir.exists()
-                    else {}
+        protein_fasta_paths = {}
+        if prot_dir.exists():
+            for ext in (
+                ".proteins.faa",
+                ".faa",
+                ".pep",
+                ".aa",
+                ".proteins.faa.gz",
+                ".faa.gz",
+                ".pep.gz",
+            ):
+                protein_fasta_paths = discover_annotation_files(
+                    prot_dir,
+                    suffix=ext,
+                    genome_ids=list(genome_paths.keys()),
                 )
                 if protein_fasta_paths:
                     break

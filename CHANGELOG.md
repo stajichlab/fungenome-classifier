@@ -58,8 +58,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 **dbCAN substrate prediction support**
 - `features/pathways.py`: added `parse_dbcan_substrate()` to parse dbCAN-sub `substrate.out` files; extracts per-genome substrate-class gene counts prefixed with `substrate_` (e.g. `substrate_cellulose`)
 - `features/pathways.py`: `build_cazyme_matrix()` accepts an optional `substrate_paths` dict; substrate features are joined into the CAZyme matrix before frequency filtering
-- `scripts/01_build_features.py`: automatically discovers `substrate.out` files in `data/raw/annotations/dbcan/` alongside `overview.txt` and passes them to `build_cazyme_matrix`
-- `utils/io.py`: `discover_annotation_files()` now falls back to the parent directory name as `genome_id` when the file name alone yields an empty stem — supports per-genome subdirectory layouts used by dbCAN3 (e.g. `dbcan/{genome_id}/overview.txt` and `dbcan/{genome_id}/substrate.out`)
+- `scripts/01_build_features.py`: discovers `overview.tsv[.gz]` and `substrates.tsv[.gz]` inside per-genome subdirectories under `data/raw/annotations/dbcan/{genome_id}/` and passes substrate paths to `build_cazyme_matrix`
+- `utils/io.py`: `discover_annotation_files()` now falls back to the parent directory name as `genome_id` when the file name alone yields an empty stem — supports per-genome subdirectory layouts (`dbcan/{genome_id}/overview.tsv.gz`, `dbcan/{genome_id}/substrates.tsv.gz`)
 
 ### Planned
 - Multi-label classification for genomes spanning multiple niches
