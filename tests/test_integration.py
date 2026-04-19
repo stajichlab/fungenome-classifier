@@ -14,15 +14,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fungal_classifier.features.fusion import BlockFusionPipeline, concat_fusion
+from fungal_classifier.evaluation.metrics import compute_metrics, cv_summary
+from fungal_classifier.evaluation.phylo_cv import CladeHoldoutCV, assign_clades_from_taxonomy
+from fungal_classifier.features.fusion import BlockFusionPipeline
 from fungal_classifier.models.block_classifier import BlockClassifier, train_all_blocks
 from fungal_classifier.models.fusion_model import StackingFusionModel
-from fungal_classifier.evaluation.phylo_cv import CladeHoldoutCV, assign_clades_from_taxonomy
-from fungal_classifier.evaluation.metrics import compute_metrics, cv_summary
-from fungal_classifier.utils.preprocessing import encode_labels, compute_class_weights
-
 
 # ── synthetic data factory ────────────────────────────────────────────────────
+
 
 def make_synthetic_dataset(
     n_genomes: int = 200,
@@ -57,7 +56,7 @@ def make_synthetic_dataset(
 
     # Feature blocks with planted signal: class centroid + noise
     label_enc = {cls: i for i, cls in enumerate(classes)}
-    label_ids = np.array([label_enc[l] for l in labels])
+    label_ids = np.array([label_enc[cls] for cls in labels])
     centroids = rng.standard_normal((n_classes, 50))
 
     feature_blocks = {}
@@ -81,6 +80,7 @@ def make_synthetic_dataset(
 
 
 # ── tests ─────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.slow
 def test_full_pipeline_xgboost():
@@ -126,8 +126,9 @@ def test_cv_no_phylo_leakage():
     for train_idx, test_idx in cv.split(X, y):
         train_clades = set(clade_labels.iloc[train_idx].values)
         test_clades = set(clade_labels.iloc[test_idx].values)
-        assert len(train_clades & test_clades) == 0, \
+        assert len(train_clades & test_clades) == 0, (
             f"Clade leakage detected: {train_clades & test_clades}"
+        )
 
 
 @pytest.mark.slow
@@ -154,7 +155,7 @@ def test_metrics_consistency():
     """Metrics computed on known-perfect predictions should return 1.0."""
     n = 50
     classes = ["A", "B", "C"]
-    y_true = pd.Series(classes * (n // 3) + classes[:n % 3], name="label")
+    y_true = pd.Series(classes * (n // 3) + classes[: n % 3], name="label")
     y_pred = y_true.copy()
     metrics = compute_metrics(y_true, y_pred)
     assert metrics["accuracy"] == pytest.approx(1.0)
@@ -165,10 +166,7 @@ def test_metrics_consistency():
 @pytest.mark.slow
 def test_cv_summary_confidence_intervals():
     """CV summary CIs should be symmetric and wider for more variable scores."""
-    fold_metrics = [
-        {"accuracy": 0.8 + 0.01 * i, "f1_macro": 0.7 + 0.02 * i}
-        for i in range(10)
-    ]
+    fold_metrics = [{"accuracy": 0.8 + 0.01 * i, "f1_macro": 0.7 + 0.02 * i} for i in range(10)]
     summary = cv_summary(fold_metrics)
     assert "accuracy" in summary.index
     assert summary.loc["accuracy", "ci_lower"] < summary.loc["accuracy", "mean"]
@@ -180,15 +178,15 @@ def test_block_classifier_handles_unseen_classes():
     """Classifier should gracefully handle test sets with fewer classes than training."""
     rng = np.random.default_rng(0)
     n_train, n_test = 200, 50
-    X_train = pd.DataFrame(rng.standard_normal((n_train, 20)).astype("float32"),
-                            index=[f"train_{i}" for i in range(n_train)])
-    X_test  = pd.DataFrame(rng.standard_normal((n_test, 20)).astype("float32"),
-                            index=[f"test_{i}" for i in range(n_test)])
-    y_train = pd.Series(rng.choice(["A", "B", "C", "D"], size=n_train),
-                        index=X_train.index)
-    y_test  = pd.Series(rng.choice(["A", "B"], size=n_test),  # only 2 of 4 classes
-                        index=X_test.index)
-
+    X_train = pd.DataFrame(
+        rng.standard_normal((n_train, 20)).astype("float32"),
+        index=[f"train_{i}" for i in range(n_train)],
+    )
+    X_test = pd.DataFrame(
+        rng.standard_normal((n_test, 20)).astype("float32"),
+        index=[f"test_{i}" for i in range(n_test)],
+    )
+    y_train = pd.Series(rng.choice(["A", "B", "C", "D"], size=n_train), index=X_train.index)
     clf = BlockClassifier(model_type="random_forest", n_estimators=10)
     clf.fit(X_train, y_train)
     preds = clf.predict(X_test)
@@ -202,7 +200,6 @@ def test_block_classifier_handles_unseen_classes():
 def test_deep_fusion_train_loop():
     """Deep fusion model should train for at least a few epochs without error."""
     try:
-        import torch
         from fungal_classifier.models.deep_fusion import DeepFusionClassifier, DeepFusionTrainer
     except ImportError:
         pytest.skip("PyTorch not available")
@@ -226,16 +223,23 @@ def test_deep_fusion_train_loop():
 
     split = n * 3 // 4
     block_train = {name: df.iloc[:split] for name, df in blocks.items()}
-    block_val   = {name: df.iloc[split:] for name, df in blocks.items()}
+    block_val = {name: df.iloc[split:] for name, df in blocks.items()}
     y_train, y_val = y.iloc[:split], y.iloc[split:]
 
     model = DeepFusionClassifier(
-        block_dims=block_dims, n_classes=n_classes,
-        hidden_dim=32, embedding_dim=16, dropout=0.0,
+        block_dims=block_dims,
+        n_classes=n_classes,
+        hidden_dim=32,
+        embedding_dim=16,
+        dropout=0.0,
     )
     trainer = DeepFusionTrainer(
-        model=model, lr=1e-3, n_epochs=5, batch_size=16,
-        patience=10, device="cpu",
+        model=model,
+        lr=1e-3,
+        n_epochs=5,
+        batch_size=16,
+        patience=10,
+        device="cpu",
     )
     history = trainer.fit(block_train, y_train, block_val, y_val)
 

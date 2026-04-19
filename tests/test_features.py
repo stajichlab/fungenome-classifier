@@ -4,15 +4,13 @@ tests/test_features.py
 Unit tests for feature extraction modules.
 """
 
-import numpy as np
 import pandas as pd
-import pytest
 
+from fungal_classifier.features.fusion import concat_fusion, filter_low_variance
 from fungal_classifier.features.kmer import _count_kmers, _obs_exp_ratio, compute_kmer_features
-from fungal_classifier.features.fusion import filter_low_variance, concat_fusion
-
 
 # ── k-mer tests ───────────────────────────────────────────────────────────────
+
 
 def test_count_kmers_k1():
     seq = "AACGT"
@@ -52,9 +50,6 @@ def test_kmer_feature_vector_length():
     """Feature vector should have 4^k entries per k value."""
     import tempfile
     from pathlib import Path
-    from Bio import SeqIO
-    from Bio.Seq import Seq
-    from Bio.SeqRecord import SeqRecord
 
     seq = "ACGTACGTACGT" * 100
     with tempfile.NamedTemporaryFile(suffix=".fasta", mode="w", delete=False) as f:
@@ -69,12 +64,15 @@ def test_kmer_feature_vector_length():
 
 # ── fusion tests ──────────────────────────────────────────────────────────────
 
+
 def test_filter_low_variance_removes_constant():
-    df = pd.DataFrame({
-        "a": [1, 1, 1, 1],
-        "b": [1, 2, 3, 4],
-        "c": [0, 0, 0, 0],
-    })
+    df = pd.DataFrame(
+        {
+            "a": [1, 1, 1, 1],
+            "b": [1, 2, 3, 4],
+            "c": [0, 0, 0, 0],
+        }
+    )
     filtered = filter_low_variance(df, threshold=0.01)
     assert "b" in filtered.columns
     assert "a" not in filtered.columns or filtered["a"].var() > 0.01

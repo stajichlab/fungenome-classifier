@@ -65,6 +65,7 @@ class StackingFusionModel:
             )
         elif self.meta_learner == "xgboost":
             import xgboost as xgb
+
             return xgb.XGBClassifier(
                 n_estimators=200,
                 max_depth=3,
@@ -171,8 +172,10 @@ class StackingFusionModel:
         common = y_true.index.intersection(y_pred.index)
         acc = accuracy_score(y_true.loc[common], y_pred.loc[common])
         f1 = f1_score(
-            y_true.loc[common], y_pred.loc[common],
-            average="macro", zero_division=0,
+            y_true.loc[common],
+            y_pred.loc[common],
+            average="macro",
+            zero_division=0,
         )
         return {"accuracy": acc, "f1_macro": f1}
 

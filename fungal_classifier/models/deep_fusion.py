@@ -25,12 +25,12 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
 
 logger = logging.getLogger(__name__)
 
 
 # ── building blocks ───────────────────────────────────────────────────────────
+
 
 class BlockTower(nn.Module):
     """
@@ -82,14 +82,15 @@ class BlockAttention(nn.Module):
         -------
         (batch, embedding_dim) weighted sum.
         """
-        concat = torch.cat(block_embeddings, dim=1)               # (batch, n_blocks * emb_dim)
-        weights = F.softmax(self.attention(concat), dim=1)        # (batch, n_blocks)
-        stacked = torch.stack(block_embeddings, dim=1)            # (batch, n_blocks, emb_dim)
-        attended = (stacked * weights.unsqueeze(2)).sum(dim=1)    # (batch, emb_dim)
+        concat = torch.cat(block_embeddings, dim=1)  # (batch, n_blocks * emb_dim)
+        weights = F.softmax(self.attention(concat), dim=1)  # (batch, n_blocks)
+        stacked = torch.stack(block_embeddings, dim=1)  # (batch, n_blocks, emb_dim)
+        attended = (stacked * weights.unsqueeze(2)).sum(dim=1)  # (batch, emb_dim)
         return attended
 
 
 # ── main model ────────────────────────────────────────────────────────────────
+
 
 class DeepFusionClassifier(nn.Module):
     """
@@ -122,16 +123,17 @@ class DeepFusionClassifier(nn.Module):
         self.aux_loss_weight = aux_loss_weight
 
         # Per-block towers
-        self.towers = nn.ModuleDict({
-            name: BlockTower(dim, hidden_dim, embedding_dim, dropout)
-            for name, dim in block_dims.items()
-        })
+        self.towers = nn.ModuleDict(
+            {
+                name: BlockTower(dim, hidden_dim, embedding_dim, dropout)
+                for name, dim in block_dims.items()
+            }
+        )
 
         # Auxiliary classifiers (one per block)
-        self.aux_heads = nn.ModuleDict({
-            name: nn.Linear(embedding_dim, n_classes)
-            for name in block_dims
-        })
+        self.aux_heads = nn.ModuleDict(
+            {name: nn.Linear(embedding_dim, n_classes) for name in block_dims}
+        )
 
         # Fusion layer
         n_blocks = len(block_dims)
@@ -175,10 +177,7 @@ class DeepFusionClassifier(nn.Module):
         emb_list = [embeddings[name] for name in self.block_names if name in embeddings]
 
         # Auxiliary losses
-        aux_logits = {
-            name: self.aux_heads[name](emb)
-            for name, emb in embeddings.items()
-        }
+        aux_logits = {name: self.aux_heads[name](emb) for name, emb in embeddings.items()}
 
         # Fusion
         if self.fusion == "attention":
@@ -200,14 +199,14 @@ class DeepFusionClassifier(nn.Module):
     ) -> torch.Tensor:
         """Compute main + auxiliary losses."""
         main_loss = F.cross_entropy(outputs["logits"], y)
-        aux_loss = torch.stack([
-            F.cross_entropy(logits, y)
-            for logits in outputs["aux_logits"].values()
-        ]).mean()
+        aux_loss = torch.stack(
+            [F.cross_entropy(logits, y) for logits in outputs["aux_logits"].values()]
+        ).mean()
         return main_loss + self.aux_loss_weight * aux_loss
 
 
 # ── training loop ─────────────────────────────────────────────────────────────
+
 
 class DeepFusionTrainer:
     """
@@ -282,6 +281,7 @@ class DeepFusionTrainer:
         List of epoch-level metrics dicts.
         """
         from sklearn.preprocessing import LabelEncoder
+
         le = LabelEncoder()
         y_enc = le.fit_transform(y_train.values)
         self.label_encoder_ = le
@@ -293,9 +293,7 @@ class DeepFusionTrainer:
         optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=self.n_epochs
-        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.n_epochs)
 
         history = []
         best_val_loss = float("inf")

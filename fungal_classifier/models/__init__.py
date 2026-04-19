@@ -1,9 +1,11 @@
 from fungal_classifier.models.block_classifier import BlockClassifier, train_all_blocks
-from fungal_classifier.models.fusion_model import StackingFusionModel
 from fungal_classifier.models.deep_fusion import DeepFusionClassifier, DeepFusionTrainer
+from fungal_classifier.models.fusion_model import StackingFusionModel
 
 __all__ = [
-    "BlockClassifier", "train_all_blocks",
+    "BlockClassifier",
+    "train_all_blocks",
     "StackingFusionModel",
-    "DeepFusionClassifier", "DeepFusionTrainer",
+    "DeepFusionClassifier",
+    "DeepFusionTrainer",
 ]

@@ -11,7 +11,6 @@ import logging
 import re
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -27,6 +26,7 @@ def open_text(path: Path):
 
 # ── metadata ──────────────────────────────────────────────────────────────────
 
+
 def load_metadata(path: Path) -> pd.DataFrame:
     """
     Load genome metadata TSV.
@@ -41,6 +41,7 @@ def load_metadata(path: Path) -> pd.DataFrame:
 
 
 # ── taxonomy ──────────────────────────────────────────────────────────────────
+
 
 def load_taxonomy(path: Path) -> pd.DataFrame:
     """
@@ -101,15 +102,11 @@ def validate_species_prefixes(
         expected = re.sub(r"\s+", "_", species) + "_" + re.sub(r"\s+", "_", strain)
         # File names equal the prefix exactly (bare directories) or start with
         # the prefix followed by '.' (e.g. "Genus_species_STRAIN.ext").
-        found = any(
-            n == expected or n.startswith(expected + ".")
-            for n in annotation_names
-        )
+        found = any(n == expected or n.startswith(expected + ".") for n in annotation_names)
         results[expected] = found
         if not found:
             logger.warning(
-                "No annotation files found for expected prefix '%s' "
-                "(SPECIES: '%s', STRAIN: '%s')",
+                "No annotation files found for expected prefix '%s' (SPECIES: '%s', STRAIN: '%s')",
                 expected,
                 species,
                 strain,
@@ -135,6 +132,7 @@ def validate_species_prefixes(
 
 # ── feature matrices ──────────────────────────────────────────────────────────
 
+
 def save_feature_matrix(df: pd.DataFrame, path: Path, format: str = "parquet") -> None:
     """Save a feature matrix to Parquet or HDF5."""
     path = Path(path)
@@ -159,7 +157,9 @@ def load_feature_matrix(path: Path) -> pd.DataFrame:
         raise ValueError(f"Unrecognized file extension: {path.suffix}")
 
 
-def load_feature_blocks(feature_dir: Path, block_names: list[str] | None = None) -> dict[str, pd.DataFrame]:
+def load_feature_blocks(
+    feature_dir: Path, block_names: list[str] | None = None
+) -> dict[str, pd.DataFrame]:
     """
     Load all feature block matrices from a directory.
 
@@ -185,6 +185,7 @@ def load_feature_blocks(feature_dir: Path, block_names: list[str] | None = None)
 
 
 # ── path discovery helpers ────────────────────────────────────────────────────
+
 
 def discover_genome_files(
     genome_dir: Path,
@@ -225,7 +226,7 @@ def discover_annotation_files(
         for path in sorted(annotation_dir.rglob(pattern)):
             name = path.name[:-3] if path.name.endswith(".gz") else path.name
             if name.endswith(bare_suffix):
-                genome_id = name[:-len(bare_suffix)].rstrip("._")
+                genome_id = name[: -len(bare_suffix)].rstrip("._")
             else:
                 continue
             if genome_ids is None or genome_id in genome_ids:
@@ -236,7 +237,10 @@ def discover_annotation_files(
 
 # ── results persistence ───────────────────────────────────────────────────────
 
-def save_predictions(predictions: pd.Series, probabilities: pd.DataFrame, output_path: Path) -> None:
+
+def save_predictions(
+    predictions: pd.Series, probabilities: pd.DataFrame, output_path: Path
+) -> None:
     """Save prediction labels and probabilities to TSV."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

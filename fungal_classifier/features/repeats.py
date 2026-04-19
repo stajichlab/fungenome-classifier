@@ -25,18 +25,24 @@ logger = logging.getLogger(__name__)
 
 # Standard RepeatMasker class hierarchy (top-level)
 REPEAT_CLASSES = [
-    "LTR", "DNA", "LINE", "SINE",
-    "RC",                          # Rolling circle
+    "LTR",
+    "DNA",
+    "LINE",
+    "SINE",
+    "RC",  # Rolling circle
     "Satellite",
     "Simple_repeat",
     "Low_complexity",
-    "rRNA", "snRNA", "srpRNA",
+    "rRNA",
+    "snRNA",
+    "srpRNA",
     "Unknown",
     "Other",
 ]
 
 
 # ── parsers ───────────────────────────────────────────────────────────────────
+
 
 def parse_rmout(path: Path) -> pd.DataFrame:
     """
@@ -104,6 +110,7 @@ def get_genome_size_from_fai(fai_path: Path) -> int:
 
 
 # ── feature building ──────────────────────────────────────────────────────────
+
 
 def compute_repeat_features(
     rmout_path: Path,

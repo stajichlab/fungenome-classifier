@@ -26,6 +26,7 @@ BLOCK_NAMES = ["kmer", "domains", "pathways", "repeats", "motifs"]
 
 # ── preprocessing per block ───────────────────────────────────────────────────
 
+
 def normalize_block(
     df: pd.DataFrame,
     scaler: Literal["standard", "minmax", "robust", "none"] = "standard",
@@ -50,9 +51,11 @@ def normalize_block(
         arr = StandardScaler().fit_transform(df.values)
     elif scaler == "minmax":
         from sklearn.preprocessing import MinMaxScaler
+
         arr = MinMaxScaler().fit_transform(df.values)
     elif scaler == "robust":
         from sklearn.preprocessing import RobustScaler
+
         arr = RobustScaler().fit_transform(df.values)
     else:
         arr = df.values.copy()
@@ -69,9 +72,11 @@ def normalize_block(
 
 # ── variance / univariate filtering ──────────────────────────────────────────
 
+
 def filter_low_variance(df: pd.DataFrame, threshold: float = 0.01) -> pd.DataFrame:
     """Drop columns with variance below threshold."""
     from sklearn.feature_selection import VarianceThreshold
+
     selector = VarianceThreshold(threshold=threshold)
     arr = selector.fit_transform(df.values)
     kept_cols = df.columns[selector.get_support()]
@@ -100,6 +105,7 @@ def select_top_k_univariate(
 
 
 # ── fusion strategies ─────────────────────────────────────────────────────────
+
 
 def concat_fusion(
     blocks: dict[str, pd.DataFrame],
@@ -148,7 +154,9 @@ def stacking_fusion(
     for name, proba_df in block_probabilities.items():
         dfs.append(proba_df.add_prefix(f"{name}__proba_"))
     fused = pd.concat(dfs, axis=1).dropna(how="all")
-    logger.info(f"Stacking fusion: {fused.shape[1]} meta-features from {len(block_probabilities)} blocks")
+    logger.info(
+        f"Stacking fusion: {fused.shape[1]} meta-features from {len(block_probabilities)} blocks"
+    )
     return fused
 
 
@@ -191,7 +199,6 @@ class BlockFusionPipeline:
         y: pd.Series,
     ) -> pd.DataFrame:
         """Fit and transform all feature blocks, return fused matrix."""
-        from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
         processed: dict[str, pd.DataFrame] = {}
 
         for name, df in blocks.items():
@@ -200,7 +207,9 @@ class BlockFusionPipeline:
 
             if self.univariate_k is not None:
                 y_aligned = y.loc[df.index]
-                df = select_top_k_univariate(df, y_aligned, self.univariate_k, self.univariate_scoring)
+                df = select_top_k_univariate(
+                    df, y_aligned, self.univariate_k, self.univariate_scoring
+                )
 
             df = normalize_block(df, self.scaler, self.svd_components)
             self._fitted_blocks[name] = df.columns.tolist()

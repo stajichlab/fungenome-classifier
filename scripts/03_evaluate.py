@@ -19,22 +19,21 @@ import logging
 import sys
 from pathlib import Path
 
-import pandas as pd
 import matplotlib
+import pandas as pd
+
 matplotlib.use("Agg")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fungal_classifier.models.fusion_model import StackingFusionModel
-from fungal_classifier.models.block_classifier import BlockClassifier
 from fungal_classifier.evaluation.metrics import (
-    plot_confusion_matrix, plot_cv_scores, print_evaluation_report,
-    cv_summary, block_comparison_table
+    plot_confusion_matrix,
+    print_evaluation_report,
 )
-from fungal_classifier.evaluation.phylo_cv import (
-    load_tree, get_patristic_distances, blombergs_k
-)
-from fungal_classifier.utils.io import load_metadata, load_feature_blocks
+from fungal_classifier.evaluation.phylo_cv import blombergs_k, get_patristic_distances, load_tree
+from fungal_classifier.models.block_classifier import BlockClassifier
+from fungal_classifier.models.fusion_model import StackingFusionModel
+from fungal_classifier.utils.io import load_feature_blocks, load_metadata
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -75,14 +74,16 @@ def main():
 
     # Predictions
     y_pred = fusion_model.predict(feature_blocks)
-    proba = fusion_model.predict_proba(feature_blocks)
 
     print_evaluation_report(y, y_pred, model_name=f"Fusion ({args.target})")
 
     # Confusion matrix
     labels = sorted(y.unique())
     plot_confusion_matrix(
-        y, y_pred, labels=labels, normalize=True,
+        y,
+        y_pred,
+        labels=labels,
+        normalize=True,
         title=f"Confusion Matrix — {args.target}",
         save_path=out_dir / "confusion_matrix.svg",
     )
@@ -94,6 +95,7 @@ def main():
         D = get_patristic_distances(tree, common_ids)
         # Encode labels as integers for K calculation
         from sklearn.preprocessing import LabelEncoder
+
         le = LabelEncoder()
         y_enc = pd.Series(le.fit_transform(y), index=y.index)
         K = blombergs_k(y_enc, D)

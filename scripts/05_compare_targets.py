@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,7 +68,8 @@ def main():
 
     # Auto-discover trained targets
     targets = [
-        d.name for d in args.results_dir.iterdir()
+        d.name
+        for d in args.results_dir.iterdir()
         if d.is_dir() and (d / "training_summary.json").exists()
     ]
     if not targets:
@@ -114,8 +116,14 @@ def main():
     # ── Plot 1: Heatmap block × target ───────────────────────────────────────
     fig, ax = plt.subplots(figsize=(max(6, len(targets) * 1.8), max(5, len(pivot) * 0.7)))
     sns.heatmap(
-        pivot, ax=ax, annot=True, fmt=".3f", cmap="YlGn",
-        vmin=0, vmax=1, linewidths=0.5,
+        pivot,
+        ax=ax,
+        annot=True,
+        fmt=".3f",
+        cmap="YlGn",
+        vmin=0,
+        vmax=1,
+        linewidths=0.5,
         cbar_kws={"label": args.metric.replace("_", " ").title()},
     )
     ax.set_title(f"Feature Block Performance — {args.metric.replace('_', ' ').title()}")
@@ -153,18 +161,32 @@ def main():
             fusion_scores[target] = float(fusion_row[mean_col].iloc[0])
 
     if fusion_scores:
-        compare_df = pd.DataFrame({
-            "Best single block": best_block_scores,
-            "Stacking fusion": fusion_scores,
-        }).T
+        compare_df = pd.DataFrame(
+            {
+                "Best single block": best_block_scores,
+                "Stacking fusion": fusion_scores,
+            }
+        ).T
 
         fig, ax = plt.subplots(figsize=(max(7, len(targets) * 1.5), 5))
         x = np.arange(len(targets))
         width = 0.35
-        bars1 = ax.bar(x - width/2, compare_df.loc["Best single block", targets],
-                       width, label="Best single block", color="#aec7e8", edgecolor="white")
-        bars2 = ax.bar(x + width/2, compare_df.loc["Stacking fusion", targets],
-                       width, label="Stacking fusion", color="#1a6fa8", edgecolor="white")
+        bars1 = ax.bar(
+            x - width / 2,
+            compare_df.loc["Best single block", targets],
+            width,
+            label="Best single block",
+            color="#aec7e8",
+            edgecolor="white",
+        )
+        bars2 = ax.bar(
+            x + width / 2,
+            compare_df.loc["Stacking fusion", targets],
+            width,
+            label="Stacking fusion",
+            color="#1a6fa8",
+            edgecolor="white",
+        )
 
         ax.set_xticks(x)
         ax.set_xticklabels([t.replace("_", "\n") for t in targets], fontsize=10)
@@ -177,12 +199,24 @@ def main():
         # Annotate bars with values
         for bar in bars1:
             h = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, h + 0.01, f"{h:.3f}",
-                    ha="center", va="bottom", fontsize=8)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                h + 0.01,
+                f"{h:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
         for bar in bars2:
             h = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, h + 0.01, f"{h:.3f}",
-                    ha="center", va="bottom", fontsize=8)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                h + 0.01,
+                f"{h:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
 
         plt.tight_layout()
         fig.savefig(args.output_dir / "fusion_vs_best_block.svg", dpi=150, bbox_inches="tight")
@@ -209,8 +243,15 @@ def main():
     fig, ax = plt.subplots(figsize=(max(7, len(pivot.columns) * 1.5), 5))
     palette = sns.color_palette("tab10", n_colors=len(pivot.index))
     for (block, row), color in zip(pivot.iterrows(), palette):
-        ax.plot(pivot.columns, row.values, marker="o", label=block,
-                color=color, linewidth=2, markersize=7)
+        ax.plot(
+            pivot.columns,
+            row.values,
+            marker="o",
+            label=block,
+            color=color,
+            linewidth=2,
+            markersize=7,
+        )
 
     ax.set_ylabel(args.metric.replace("_", " ").title())
     ax.set_xlabel("Target")
@@ -225,17 +266,17 @@ def main():
     plt.close()
 
     # ── Summary report ────────────────────────────────────────────────────────
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Multi-Target Comparison Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"\n  Metric: {args.metric}")
-    print(f"\n  Block × Target F1 matrix:\n")
+    print("\n  Block × Target F1 matrix:\n")
     print(pivot.round(3).to_string(float_format="{:.3f}".format))
-    print(f"\n  Most consistently informative blocks:")
+    print("\n  Most consistently informative blocks:")
     for block, rank in mean_rank.items():
         print(f"    {block:20s}  mean rank = {rank:.1f}")
     print(f"\n  Outputs saved to: {args.output_dir}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

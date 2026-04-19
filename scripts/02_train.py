@@ -32,23 +32,24 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fungal_classifier.features.fusion import BlockFusionPipeline
-from fungal_classifier.models.block_classifier import BlockClassifier, train_all_blocks
-from fungal_classifier.models.fusion_model import StackingFusionModel
-from fungal_classifier.models.deep_fusion import DeepFusionClassifier, DeepFusionTrainer
+from fungal_classifier.evaluation.metrics import (
+    block_comparison_table,
+    cv_summary,
+)
 from fungal_classifier.evaluation.phylo_cv import (
     CladeHoldoutCV,
     assign_clades_from_taxonomy,
     assign_clades_from_tree,
-    phylogenetic_eigenvectors,
     get_patristic_distances,
     load_tree,
-)
-from fungal_classifier.evaluation.metrics import (
-    cv_summary, block_comparison_table, print_evaluation_report
+    phylogenetic_eigenvectors,
 )
 from fungal_classifier.evaluation.shap_analysis import run_shap_analysis
-from fungal_classifier.utils.io import load_metadata, load_feature_blocks, save_predictions
+from fungal_classifier.features.fusion import BlockFusionPipeline
+from fungal_classifier.models.block_classifier import train_all_blocks
+from fungal_classifier.models.deep_fusion import DeepFusionClassifier, DeepFusionTrainer
+from fungal_classifier.models.fusion_model import StackingFusionModel
+from fungal_classifier.utils.io import load_feature_blocks, load_metadata
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,15 +63,19 @@ def parse_args():
     p.add_argument("--features-dir", type=Path, default=Path("data/features"))
     p.add_argument("--metadata", type=Path, required=True)
     p.add_argument("--tree", type=Path, help="Newick phylogenetic tree file")
-    p.add_argument("--target", required=True,
-                   help="Metadata column to use as classification target")
+    p.add_argument(
+        "--target", required=True, help="Metadata column to use as classification target"
+    )
     p.add_argument("--config", type=Path, default=Path("configs/default.yaml"))
     p.add_argument("--output-dir", type=Path, default=Path("results"))
     p.add_argument("--model-type", choices=["xgboost", "lightgbm", "deep"], default="xgboost")
     p.add_argument("--cv-strategy", choices=["clade_holdout", "random"], default="clade_holdout")
     p.add_argument("--no-shap", action="store_true", help="Skip SHAP analysis")
-    p.add_argument("--phylo-eigenvectors", action="store_true",
-                   help="Include phylogenetic eigenvectors as features")
+    p.add_argument(
+        "--phylo-eigenvectors",
+        action="store_true",
+        help="Include phylogenetic eigenvectors as features",
+    )
     return p.parse_args()
 
 
@@ -85,8 +90,10 @@ def main():
     # ── Load data ─────────────────────────────────────────────────────────────
     metadata = load_metadata(args.metadata)
     if args.target not in metadata.columns:
-        raise ValueError(f"Target column '{args.target}' not found in metadata. "
-                         f"Available: {list(metadata.columns)}")
+        raise ValueError(
+            f"Target column '{args.target}' not found in metadata. "
+            f"Available: {list(metadata.columns)}"
+        )
 
     y = metadata[args.target].dropna()
     logger.info(f"Target: {args.target} | Classes: {y.nunique()} | Samples: {len(y)}")
@@ -136,6 +143,7 @@ def main():
         logger.info(f"\nCV fold summary:\n{fold_summary.to_string()}")
     else:
         from sklearn.model_selection import StratifiedKFold
+
         cv = StratifiedKFold(
             n_splits=cv_cfg["n_folds"],
             shuffle=True,
@@ -158,7 +166,6 @@ def main():
         logger.info(f"Fused feature matrix: {X_fused.shape}")
 
     # ── Train block classifiers ───────────────────────────────────────────────
-    model_cfg = config["models"]["block_classifier"]
     block_model_kwargs = {
         "model_type": args.model_type if args.model_type != "deep" else "xgboost",
         **config["models"]["block_classifier"].get(args.model_type, {}),
@@ -178,6 +185,10 @@ def main():
     comparison.to_csv(args.output_dir / "block_comparison.csv", index=False)
     logger.info(f"\nBlock performance comparison:\n{comparison.to_string()}")
 
+    # ── Save path (used by both deep and stacking branches) ──────────────────
+    models_dir = args.output_dir / "models"
+    models_dir.mkdir(exist_ok=True)
+
     # ── Train stacking fusion model ───────────────────────────────────────────
     if args.model_type == "deep":
         logger.info("\nTraining deep fusion model...")
@@ -189,6 +200,7 @@ def main():
         reduced_blocks = {}
         from sklearn.decomposition import TruncatedSVD
         from sklearn.preprocessing import StandardScaler
+
         svd_k = prep_cfg.get("svd_components", 150)
         for name, df in feature_blocks.items():
             scaler = StandardScaler()
@@ -196,8 +208,9 @@ def main():
             k = min(svd_k, arr.shape[1] - 1)
             svd = TruncatedSVD(n_components=k, random_state=42)
             arr_r = svd.fit_transform(arr)
-            reduced_blocks[name] = pd.DataFrame(arr_r, index=df.index,
-                                                columns=[f"svd_{i}" for i in range(k)])
+            reduced_blocks[name] = pd.DataFrame(
+                arr_r, index=df.index, columns=[f"svd_{i}" for i in range(k)]
+            )
             block_dims[name] = k
 
         n_classes = y.nunique()
@@ -215,9 +228,9 @@ def main():
         folds = list(cv.split(next(iter(reduced_blocks.values())), y))
         train_idx, val_idx = folds[-1]
         block_train = {n: df.iloc[train_idx] for n, df in reduced_blocks.items()}
-        block_val   = {n: df.iloc[val_idx]   for n, df in reduced_blocks.items()}
+        block_val = {n: df.iloc[val_idx] for n, df in reduced_blocks.items()}
         y_train = y.iloc[train_idx]
-        y_val   = y.iloc[val_idx]
+        y_val = y.iloc[val_idx]
 
         trainer = DeepFusionTrainer(
             model=deep_model,
@@ -237,14 +250,14 @@ def main():
         # Save attention weights if available
         if deep_cfg["fusion"] == "attention" and config["output"].get("save_attention_weights"):
             import torch
+
             deep_model.eval()
             with torch.no_grad():
                 all_tensors = {
-                    n: torch.tensor(df.values.astype("float32"),
-                                    device=trainer.device)
+                    n: torch.tensor(df.values.astype("float32"), device=trainer.device)
                     for n, df in reduced_blocks.items()
                 }
-                out = deep_model(all_tensors)
+                deep_model(all_tensors)
             # Save attention weights by computing them manually
             logger.info("Attention weights saved.")
 
@@ -264,9 +277,6 @@ def main():
     )
 
     # ── Save models ───────────────────────────────────────────────────────────
-    models_dir = args.output_dir / "models"
-    models_dir.mkdir(exist_ok=True)
-
     for block_name, clf in block_classifiers.items():
         clf.save(models_dir / f"block_{block_name}.pkl")
 

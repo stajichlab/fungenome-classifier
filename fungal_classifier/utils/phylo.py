@@ -13,7 +13,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -28,9 +27,10 @@ def prune_tree_to_genomes(tree, genome_ids: list[str]):
     """
     try:
         from ete3 import Tree
+
         if isinstance(tree, Tree):
             tree = tree.copy()
-            tip_names = {l.name for l in tree.iter_leaves()}
+            tip_names = {leaf.name for leaf in tree.iter_leaves()}
             to_keep = set(genome_ids) & tip_names
             to_prune = tip_names - to_keep
             if to_prune:
@@ -42,10 +42,9 @@ def prune_tree_to_genomes(tree, genome_ids: list[str]):
 
     try:
         import dendropy
+
         if isinstance(tree, dendropy.Tree):
-            taxa_to_keep = {
-                t for t in tree.taxon_namespace if t.label in set(genome_ids)
-            }
+            taxa_to_keep = {t for t in tree.taxon_namespace if t.label in set(genome_ids)}
             tree.retain_taxa(taxa_to_keep)
             return tree
     except ImportError:
@@ -58,12 +57,14 @@ def get_tree_tip_names(tree) -> list[str]:
     """Return list of tip names from ete3 or dendropy tree."""
     try:
         from ete3 import Tree
+
         if isinstance(tree, Tree):
-            return [l.name for l in tree.iter_leaves()]
+            return [leaf.name for leaf in tree.iter_leaves()]
     except ImportError:
         pass
     try:
         import dendropy
+
         if isinstance(tree, dendropy.Tree):
             return [t.label for t in tree.taxon_namespace]
     except ImportError:
@@ -142,7 +143,9 @@ def expand_taxonomy_column(
     return pd.concat([metadata, tax_df], axis=1)
 
 
-def get_clade_members(tree, clade_name: str, metadata: pd.DataFrame, level: str = "order") -> list[str]:
+def get_clade_members(
+    tree, clade_name: str, metadata: pd.DataFrame, level: str = "order"
+) -> list[str]:
     """
     Return genome IDs belonging to a named clade based on taxonomy metadata.
     """

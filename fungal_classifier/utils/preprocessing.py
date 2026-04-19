@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 # ── transforms ────────────────────────────────────────────────────────────────
 
+
 def log1p_transform(df: pd.DataFrame) -> pd.DataFrame:
     """Apply log(1 + x) transform — appropriate for count data (domains, CAZymes, BGC)."""
     return np.log1p(df).astype(np.float32)
@@ -48,6 +49,7 @@ def binarize_threshold(df: pd.DataFrame, threshold: float = 0.0) -> pd.DataFrame
 
 # ── imputation ────────────────────────────────────────────────────────────────
 
+
 def impute_missing(
     df: pd.DataFrame,
     strategy: str = "median",
@@ -63,11 +65,13 @@ def impute_missing(
         return df.fillna(0.0).astype(np.float32)
     elif strategy in ("median", "mean"):
         from sklearn.impute import SimpleImputer
+
         imp = SimpleImputer(strategy=strategy)
         arr = imp.fit_transform(df.values)
         return pd.DataFrame(arr, index=df.index, columns=df.columns, dtype=np.float32)
     elif strategy == "knn":
         from sklearn.impute import KNNImputer
+
         imp = KNNImputer(n_neighbors=5)
         arr = imp.fit_transform(df.values)
         return pd.DataFrame(arr, index=df.index, columns=df.columns, dtype=np.float32)
@@ -77,6 +81,7 @@ def impute_missing(
 
 # ── class imbalance ───────────────────────────────────────────────────────────
 
+
 def compute_class_weights(y: pd.Series) -> dict:
     """
     Compute balanced class weights for imbalanced classification.
@@ -84,6 +89,7 @@ def compute_class_weights(y: pd.Series) -> dict:
     Returns dict suitable for XGBoost sample_weight or sklearn class_weight.
     """
     from sklearn.utils.class_weight import compute_class_weight
+
     classes = np.unique(y)
     weights = compute_class_weight("balanced", classes=classes, y=y)
     return dict(zip(classes, weights))
@@ -125,6 +131,7 @@ def apply_smote(
 
 # ── label encoding helpers ────────────────────────────────────────────────────
 
+
 def encode_labels(
     y: pd.Series,
     min_class_size: int = 5,
@@ -154,6 +161,7 @@ def encode_labels(
 
 
 # ── genome-size correction ────────────────────────────────────────────────────
+
 
 def correct_for_genome_size(
     df: pd.DataFrame,

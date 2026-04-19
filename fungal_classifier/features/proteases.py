@@ -30,21 +30,33 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 # Minimum BLAST identity (%) and coverage to trust a hit
-MIN_IDENTITY   = 30.0
-MIN_ALIGN_LEN  = 50
-MAX_EVALUE     = 1e-5
+MIN_IDENTITY = 30.0
+MIN_ALIGN_LEN = 50
+MAX_EVALUE = 1e-5
 
 # MEROPS family-to-clan mapping (partial; extend as needed)
 FAMILY_TO_CLAN: dict[str, str] = {
-    "A01": "AA", "A02": "AA", "A11": "AA", "A22": "AA",
-    "C01": "CA", "C02": "CA", "C19": "CA",
-    "M01": "MA", "M02": "MA", "M04": "MA", "M10": "MA",
-    "S01": "SA", "S08": "SB", "S09": "SC", "S10": "SC",
+    "A01": "AA",
+    "A02": "AA",
+    "A11": "AA",
+    "A22": "AA",
+    "C01": "CA",
+    "C02": "CA",
+    "C19": "CA",
+    "M01": "MA",
+    "M02": "MA",
+    "M04": "MA",
+    "M10": "MA",
+    "S01": "SA",
+    "S08": "SB",
+    "S09": "SC",
+    "S10": "SC",
     "T01": "PB",
 }
 
 
 # ── parser ────────────────────────────────────────────────────────────────────
+
 
 def parse_merops_blast(
     path: Path,
@@ -73,9 +85,9 @@ def parse_merops_blast(
             if len(parts) < 12:
                 continue
             try:
-                identity  = float(parts[2])
+                identity = float(parts[2])
                 align_len = int(parts[3])
-                evalue    = float(parts[10])
+                evalue = float(parts[10])
             except (IndexError, ValueError):
                 continue
             if identity < min_identity or align_len < min_align_len or evalue > max_evalue:
@@ -85,16 +97,18 @@ def parse_merops_blast(
             # Extract family code: e.g. "S01.001" → "S01"
             m = re.match(r"([A-Z]\d{2})", merops_id)
             family = m.group(1) if m else "unknown"
-            clan   = FAMILY_TO_CLAN.get(family, "unassigned")
+            clan = FAMILY_TO_CLAN.get(family, "unassigned")
 
-            records.append({
-                "protein_id": parts[0],
-                "merops_id":  merops_id,
-                "family":     family,
-                "clan":       clan,
-                "identity":   identity,
-                "evalue":     evalue,
-            })
+            records.append(
+                {
+                    "protein_id": parts[0],
+                    "merops_id": merops_id,
+                    "family": family,
+                    "clan": clan,
+                    "identity": identity,
+                    "evalue": evalue,
+                }
+            )
 
     df = pd.DataFrame(records)
     if df.empty:
@@ -104,6 +118,7 @@ def parse_merops_blast(
 
 
 # ── feature building ──────────────────────────────────────────────────────────
+
 
 def merops_to_features(df: pd.DataFrame, n_proteins: int | None = None) -> pd.Series:
     """
@@ -136,9 +151,9 @@ def merops_to_features(df: pd.DataFrame, n_proteins: int | None = None) -> pd.Se
 
 def build_merops_matrix(
     annotation_paths: dict[str, Path],
-    min_identity:  float = MIN_IDENTITY,
-    min_align_len: int   = MIN_ALIGN_LEN,
-    max_evalue:    float = MAX_EVALUE,
+    min_identity: float = MIN_IDENTITY,
+    min_align_len: int = MIN_ALIGN_LEN,
+    max_evalue: float = MAX_EVALUE,
     min_genome_freq: float = 0.01,
 ) -> pd.DataFrame:
     """

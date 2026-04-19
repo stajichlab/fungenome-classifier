@@ -15,9 +15,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── core metrics ──────────────────────────────────────────────────────────────
+
 
 def compute_metrics(
     y_true: pd.Series | np.ndarray,
@@ -57,7 +58,9 @@ def compute_metrics(
         f"{prefix}balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
         f"{prefix}f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
         f"{prefix}f1_weighted": f1_score(y_true, y_pred, average="weighted", zero_division=0),
-        f"{prefix}precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
+        f"{prefix}precision_macro": precision_score(
+            y_true, y_pred, average="macro", zero_division=0
+        ),
         f"{prefix}recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
         f"{prefix}mcc": matthews_corrcoef(y_true, y_pred),
     }
@@ -83,6 +86,7 @@ def per_class_metrics(
 
 # ── CV summary ────────────────────────────────────────────────────────────────
 
+
 def cv_summary(
     fold_metrics: list[dict],
     ci: float = 0.95,
@@ -102,7 +106,6 @@ def cv_summary(
     df = pd.DataFrame(fold_metrics)
     numeric = df.select_dtypes(include=np.number)
     z = 1.96 if ci == 0.95 else 2.576  # 95% or 99%
-    n = len(numeric)
 
     summary_rows = []
     for col in numeric.columns:
@@ -110,13 +113,15 @@ def cv_summary(
         mean = vals.mean()
         std = vals.std()
         se = std / np.sqrt(len(vals))
-        summary_rows.append({
-            "metric": col,
-            "mean": mean,
-            "std": std,
-            "ci_lower": mean - z * se,
-            "ci_upper": mean + z * se,
-        })
+        summary_rows.append(
+            {
+                "metric": col,
+                "mean": mean,
+                "std": std,
+                "ci_lower": mean - z * se,
+                "ci_upper": mean + z * se,
+            }
+        )
     return pd.DataFrame(summary_rows).set_index("metric")
 
 
@@ -141,11 +146,13 @@ def block_comparison_table(
         if metric not in scores_df.columns:
             continue
         vals = scores_df[metric]
-        rows.append({
-            "block": block_name,
-            f"mean_{metric}": vals.mean(),
-            f"std_{metric}": vals.std(),
-        })
+        rows.append(
+            {
+                "block": block_name,
+                f"mean_{metric}": vals.mean(),
+                f"std_{metric}": vals.std(),
+            }
+        )
     df = pd.DataFrame(rows).sort_values(f"mean_{metric}", ascending=False)
     df["mean ± std"] = df.apply(
         lambda r: f"{r[f'mean_{metric}']:.3f} ± {r[f'std_{metric}']:.3f}", axis=1
@@ -154,6 +161,7 @@ def block_comparison_table(
 
 
 # ── visualization ─────────────────────────────────────────────────────────────
+
 
 def plot_confusion_matrix(
     y_true: pd.Series | np.ndarray,
@@ -186,9 +194,14 @@ def plot_confusion_matrix(
 
     fig, ax = plt.subplots(figsize=figsize)
     sns.heatmap(
-        cm, annot=True, fmt=fmt, cmap="Blues",
-        xticklabels=labels, yticklabels=labels,
-        ax=ax, linewidths=0.5,
+        cm,
+        annot=True,
+        fmt=fmt,
+        cmap="Blues",
+        xticklabels=labels,
+        yticklabels=labels,
+        ax=ax,
+        linewidths=0.5,
         annot_kws={"size": max(6, 10 - n_classes // 5)},
     )
     ax.set_xlabel("Predicted")
@@ -240,6 +253,7 @@ def plot_cv_scores(
 
 # ── reporting ─────────────────────────────────────────────────────────────────
 
+
 def print_evaluation_report(
     y_true: pd.Series,
     y_pred: pd.Series,
@@ -247,11 +261,11 @@ def print_evaluation_report(
 ) -> None:
     """Print a formatted evaluation report to stdout."""
     metrics = compute_metrics(y_true, y_pred)
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"  {model_name} Evaluation Report")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
     for name, val in metrics.items():
         print(f"  {name:<30} {val:.4f}")
-    print(f"\nPer-class breakdown:")
+    print("\nPer-class breakdown:")
     print(per_class_metrics(y_true, y_pred).to_string())
-    print(f"{'='*50}\n")
+    print(f"{'=' * 50}\n")

@@ -23,13 +23,23 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 WOLFPSORT_LOCS = [
-    "nucl", "mito", "cyto", "extr", "plas",
-    "E.R.", "golg", "vacu", "cysk", "pero",
-    "cyto_nucl", "cyto_pero",
+    "nucl",
+    "mito",
+    "cyto",
+    "extr",
+    "plas",
+    "E.R.",
+    "golg",
+    "vacu",
+    "cysk",
+    "pero",
+    "cyto_nucl",
+    "cyto_pero",
 ]
 
 
 # ── TMHMM ────────────────────────────────────────────────────────────────────
+
 
 def parse_tmhmm(path: Path) -> pd.DataFrame:
     """
@@ -53,14 +63,16 @@ def parse_tmhmm(path: Path) -> pd.DataFrame:
                 continue
             try:
                 kv = {p.split("=")[0]: p.split("=")[1] for p in parts[1:] if "=" in p}
-                records.append({
-                    "protein_id": parts[0],
-                    "length":     int(kv.get("len", 0)),
-                    "exp_aa":     float(kv.get("ExpAA", 0)),
-                    "first60":    float(kv.get("First60", 0)),
-                    "pred_hel":   int(kv.get("PredHel", 0)),
-                    "topology":   kv.get("Topology", ""),
-                })
+                records.append(
+                    {
+                        "protein_id": parts[0],
+                        "length": int(kv.get("len", 0)),
+                        "exp_aa": float(kv.get("ExpAA", 0)),
+                        "first60": float(kv.get("First60", 0)),
+                        "pred_hel": int(kv.get("PredHel", 0)),
+                        "topology": kv.get("Topology", ""),
+                    }
+                )
             except (IndexError, ValueError):
                 continue
     return pd.DataFrame(records)
@@ -73,9 +85,9 @@ def tmhmm_to_features(df: pd.DataFrame) -> pd.Series:
 
     n = len(df)
     features: dict[str, float] = {
-        "tmhmm_frac_with_tm":  float((df["pred_hel"] >= 1).sum()) / n,
-        "tmhmm_mean_predhel":  float(df["pred_hel"].mean()),
-        "tmhmm_mean_expaa":    float(df["exp_aa"].mean()),
+        "tmhmm_frac_with_tm": float((df["pred_hel"] >= 1).sum()) / n,
+        "tmhmm_mean_predhel": float(df["pred_hel"].mean()),
+        "tmhmm_mean_expaa": float(df["exp_aa"].mean()),
     }
     for k in range(6):
         label = str(k) if k < 5 else "5plus"
@@ -104,6 +116,7 @@ def build_tmhmm_matrix(
 
 # ── SignalP ───────────────────────────────────────────────────────────────────
 
+
 def parse_signalp(path: Path) -> pd.DataFrame:
     """
     Parse SignalP-6 output.
@@ -127,12 +140,14 @@ def parse_signalp(path: Path) -> pd.DataFrame:
             try:
                 protein_id = parts[0].split()[0]
                 prediction = parts[1].strip()
-                sp_prob    = float(parts[3])
-                records.append({
-                    "protein_id": protein_id,
-                    "prediction": prediction,
-                    "sp_prob":    sp_prob,
-                })
+                sp_prob = float(parts[3])
+                records.append(
+                    {
+                        "protein_id": protein_id,
+                        "prediction": prediction,
+                        "sp_prob": sp_prob,
+                    }
+                )
             except (IndexError, ValueError):
                 continue
     return pd.DataFrame(records)
@@ -143,10 +158,13 @@ def signalp_to_features(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=np.float32)
     n = len(df)
-    return pd.Series({
-        "signalp_frac_sp":      float((df["prediction"] == "SP").sum()) / n,
-        "signalp_mean_sp_prob": float(df["sp_prob"].mean()),
-    }, dtype=np.float32)
+    return pd.Series(
+        {
+            "signalp_frac_sp": float((df["prediction"] == "SP").sum()) / n,
+            "signalp_mean_sp_prob": float(df["sp_prob"].mean()),
+        },
+        dtype=np.float32,
+    )
 
 
 def build_signalp_matrix(annotation_paths: dict[str, Path]) -> pd.DataFrame:
@@ -165,6 +183,7 @@ def build_signalp_matrix(annotation_paths: dict[str, Path]) -> pd.DataFrame:
 
 
 # ── WolfPSORT ─────────────────────────────────────────────────────────────────
+
 
 def parse_wolfpsort(path: Path) -> pd.DataFrame:
     """
@@ -243,6 +262,7 @@ def build_wolfpsort_matrix(annotation_paths: dict[str, Path]) -> pd.DataFrame:
 
 # ── TargetP ───────────────────────────────────────────────────────────────────
 
+
 def parse_targetp(path: Path) -> pd.DataFrame:
     """
     Parse TargetP-2 summary output.
@@ -264,13 +284,15 @@ def parse_targetp(path: Path) -> pd.DataFrame:
             if len(parts) < 5:
                 continue
             try:
-                records.append({
-                    "protein_id": parts[0].strip(),
-                    "prediction": parts[1].strip(),
-                    "notp_prob":  float(parts[2]),
-                    "sp_prob":    float(parts[3]),
-                    "mtp_prob":   float(parts[4]),
-                })
+                records.append(
+                    {
+                        "protein_id": parts[0].strip(),
+                        "prediction": parts[1].strip(),
+                        "notp_prob": float(parts[2]),
+                        "sp_prob": float(parts[3]),
+                        "mtp_prob": float(parts[4]),
+                    }
+                )
             except (IndexError, ValueError):
                 continue
     return pd.DataFrame(records)
@@ -281,13 +303,16 @@ def targetp_to_features(df: pd.DataFrame) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=np.float32)
     n = len(df)
-    return pd.Series({
-        "targetp_frac_noTP":      float((df["prediction"] == "noTP").sum()) / n,
-        "targetp_frac_SP":        float((df["prediction"] == "SP").sum()) / n,
-        "targetp_frac_mTP":       float((df["prediction"] == "mTP").sum()) / n,
-        "targetp_mean_sp_prob":   float(df["sp_prob"].mean()),
-        "targetp_mean_mtp_prob":  float(df["mtp_prob"].mean()),
-    }, dtype=np.float32)
+    return pd.Series(
+        {
+            "targetp_frac_noTP": float((df["prediction"] == "noTP").sum()) / n,
+            "targetp_frac_SP": float((df["prediction"] == "SP").sum()) / n,
+            "targetp_frac_mTP": float((df["prediction"] == "mTP").sum()) / n,
+            "targetp_mean_sp_prob": float(df["sp_prob"].mean()),
+            "targetp_mean_mtp_prob": float(df["mtp_prob"].mean()),
+        },
+        dtype=np.float32,
+    )
 
 
 def build_targetp_matrix(annotation_paths: dict[str, Path]) -> pd.DataFrame:
@@ -307,11 +332,12 @@ def build_targetp_matrix(annotation_paths: dict[str, Path]) -> pd.DataFrame:
 
 # ── Combined subcellular matrix ───────────────────────────────────────────────
 
+
 def build_subcellular_matrix(
-    tmhmm_paths:    dict[str, Path] | None = None,
-    signalp_paths:  dict[str, Path] | None = None,
+    tmhmm_paths: dict[str, Path] | None = None,
+    signalp_paths: dict[str, Path] | None = None,
     wolfpsort_paths: dict[str, Path] | None = None,
-    targetp_paths:  dict[str, Path] | None = None,
+    targetp_paths: dict[str, Path] | None = None,
 ) -> pd.DataFrame:
     """
     Concatenate all available subcellular feature blocks into one matrix.

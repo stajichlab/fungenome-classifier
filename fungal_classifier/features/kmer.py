@@ -21,7 +21,7 @@ import gzip
 import itertools
 import logging
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -34,6 +34,7 @@ NUCLEOTIDES = list("ACGT")
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _all_kmers(k: int) -> list[str]:
     """Return all canonical k-mer strings for alphabet ACGT."""
@@ -91,6 +92,7 @@ def _load_sequences(
 
 
 # ── public API ────────────────────────────────────────────────────────────────
+
 
 def compute_kmer_features(
     fasta_path: Path,

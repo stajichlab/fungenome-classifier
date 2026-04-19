@@ -22,25 +22,29 @@ import yaml
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fungal_classifier.features.kmer import build_kmer_matrix
-from fungal_classifier.features.domains import build_domain_matrix
-from fungal_classifier.features.pathways import (
-    build_kegg_matrix, build_cazyme_matrix, build_bgc_matrix, build_go_matrix
-)
-from fungal_classifier.features.repeats import build_repeat_matrix
-from fungal_classifier.features.motifs import build_motif_matrix_from_genomes
-from fungal_classifier.features.subcellular import build_subcellular_matrix
-from fungal_classifier.features.disorder import build_disorder_matrix
-from fungal_classifier.features.proteases import build_merops_matrix
 from fungal_classifier.features.composition import (
     build_composition_matrix_from_csvs,
     build_composition_matrix_from_fasta,
 )
+from fungal_classifier.features.disorder import build_disorder_matrix
+from fungal_classifier.features.domains import build_domain_matrix
 from fungal_classifier.features.genomic import build_genomic_matrix
 from fungal_classifier.features.introns import build_intron_matrix
+from fungal_classifier.features.kmer import build_kmer_matrix
+from fungal_classifier.features.motifs import build_motif_matrix_from_genomes
+from fungal_classifier.features.pathways import (
+    build_bgc_matrix,
+    build_cazyme_matrix,
+)
+from fungal_classifier.features.proteases import build_merops_matrix
+from fungal_classifier.features.repeats import build_repeat_matrix
+from fungal_classifier.features.subcellular import build_subcellular_matrix
 from fungal_classifier.utils.io import (
-    discover_genome_files, discover_annotation_files,
-    load_metadata, load_taxonomy, save_feature_matrix,
+    discover_annotation_files,
+    discover_genome_files,
+    load_metadata,
+    load_taxonomy,
+    save_feature_matrix,
     validate_species_prefixes,
 )
 
@@ -54,16 +58,37 @@ logger = logging.getLogger(__name__)
 def parse_args():
     p = argparse.ArgumentParser(description="Build feature matrices for FungalClassifier")
     p.add_argument("--genome-dir", type=Path, required=True, help="Directory of genome FASTA files")
-    p.add_argument("--annotation-dir", type=Path, required=True, help="Directory of annotation files")
-    p.add_argument("--metadata", type=Path, help="Metadata TSV file (optional, for genome ID filtering)")
-    p.add_argument("--taxonomy", type=Path, help="Taxonomy CSV (samples.csv) for metadata enrichment")
-    p.add_argument("--output-dir", type=Path, default=Path("data/features"), help="Output directory")
+    p.add_argument(
+        "--annotation-dir", type=Path, required=True, help="Directory of annotation files"
+    )
+    p.add_argument(
+        "--metadata", type=Path, help="Metadata TSV file (optional, for genome ID filtering)"
+    )
+    p.add_argument(
+        "--taxonomy", type=Path, help="Taxonomy CSV (samples.csv) for metadata enrichment"
+    )
+    p.add_argument(
+        "--output-dir", type=Path, default=Path("data/features"), help="Output directory"
+    )
     p.add_argument("--config", type=Path, default=Path("configs/default.yaml"), help="Config YAML")
-    p.add_argument("--blocks", nargs="+",
-                   default=["kmer", "domains", "pathways", "repeats", "motifs",
-                            "subcellular", "disorder", "proteases", "composition",
-                            "genomic", "introns"],
-                   help="Which feature blocks to build")
+    p.add_argument(
+        "--blocks",
+        nargs="+",
+        default=[
+            "kmer",
+            "domains",
+            "pathways",
+            "repeats",
+            "motifs",
+            "subcellular",
+            "disorder",
+            "proteases",
+            "composition",
+            "genomic",
+            "introns",
+        ],
+        help="Which feature blocks to build",
+    )
     p.add_argument("--n-jobs", type=int, default=4, help="Parallel jobs")
     p.add_argument("--format", choices=["parquet", "hdf5"], default="parquet")
     return p.parse_args()
@@ -201,7 +226,9 @@ def main():
     # ── motif features ───────────────────────────────────────────────────────
     if "motifs" in args.blocks:
         motif_cfg = config["features"]["motifs"]
-        pwm_db = args.annotation_dir / "jaspar" / "JASPAR2024_CORE_fungi_non-redundant_pfms_meme.txt"
+        pwm_db = (
+            args.annotation_dir / "jaspar" / "JASPAR2024_CORE_fungi_non-redundant_pfms_meme.txt"
+        )
 
         if not pwm_db.exists():
             logger.warning(
@@ -239,22 +266,24 @@ def main():
 
     # ── subcellular localisation features ────────────────────────────────────
     if "subcellular" in args.blocks:
-        sub_cfg = config["features"].get("subcellular", {})
-
         tmhmm_paths = discover_annotation_files(
-            args.annotation_dir / "tmhmm", suffix=".tmhmm_short.tsv",
+            args.annotation_dir / "tmhmm",
+            suffix=".tmhmm_short.tsv",
             genome_ids=list(genome_paths.keys()),
         )
         signalp_paths = discover_annotation_files(
-            args.annotation_dir / "signalp", suffix=".signalp.results.txt",
+            args.annotation_dir / "signalp",
+            suffix=".signalp.results.txt",
             genome_ids=list(genome_paths.keys()),
         )
         wolfpsort_paths = discover_annotation_files(
-            args.annotation_dir / "wolfpsort", suffix=".wolfpsort.results.txt",
+            args.annotation_dir / "wolfpsort",
+            suffix=".wolfpsort.results.txt",
             genome_ids=list(genome_paths.keys()),
         )
         targetp_paths = discover_annotation_files(
-            args.annotation_dir / "targetp", suffix="_summary.targetp2",
+            args.annotation_dir / "targetp",
+            suffix="_summary.targetp2",
             genome_ids=list(genome_paths.keys()),
         )
 
@@ -279,7 +308,8 @@ def main():
     if "disorder" in args.blocks:
         dis_cfg = config["features"].get("disorder", {})
         aiupred_paths = discover_annotation_files(
-            args.annotation_dir / "aiupred", suffix=".aiupred.txt",
+            args.annotation_dir / "aiupred",
+            suffix=".aiupred.txt",
             genome_ids=list(genome_paths.keys()),
         )
         if aiupred_paths:
@@ -301,7 +331,8 @@ def main():
     if "proteases" in args.blocks:
         pro_cfg = config["features"].get("proteases", {})
         merops_paths = discover_annotation_files(
-            args.annotation_dir / "merops", suffix=".merops.blasttab",
+            args.annotation_dir / "merops",
+            suffix=".merops.blasttab",
             genome_ids=list(genome_paths.keys()),
         )
         if merops_paths:
@@ -326,11 +357,13 @@ def main():
         cds_dir = args.annotation_dir / "cds"
 
         codon_csv_paths = discover_annotation_files(
-            cds_dir, suffix=".cds-transcripts.codon_freq.csv",
+            cds_dir,
+            suffix=".cds-transcripts.codon_freq.csv",
             genome_ids=list(genome_paths.keys()),
         )
         cds_fasta_paths = discover_annotation_files(
-            cds_dir, suffix=".cds-transcripts.fa",
+            cds_dir,
+            suffix=".cds-transcripts.fa",
             genome_ids=list(genome_paths.keys()),
         )
 
@@ -343,9 +376,7 @@ def main():
                 cds_fasta_paths=cds_fasta_paths or None,
             )
         elif cds_fasta_paths:
-            logger.info(
-                f"Building composition matrix from {len(cds_fasta_paths)} CDS FASTAs..."
-            )
+            logger.info(f"Building composition matrix from {len(cds_fasta_paths)} CDS FASTAs...")
             comp_matrix = build_composition_matrix_from_fasta(
                 cds_fasta_paths=cds_fasta_paths,
                 n_jobs=args.n_jobs,
@@ -364,19 +395,27 @@ def main():
     # ── genomic size features (genome length, N50, protein lengths) ──────────
     if "genomic" in args.blocks:
         prot_dir = args.annotation_dir / "proteins"
-        protein_fasta_paths = discover_annotation_files(
-            prot_dir,
-            suffix=".faa",
-            genome_ids=list(genome_paths.keys()),
-        ) if prot_dir.exists() else {}
+        protein_fasta_paths = (
+            discover_annotation_files(
+                prot_dir,
+                suffix=".faa",
+                genome_ids=list(genome_paths.keys()),
+            )
+            if prot_dir.exists()
+            else {}
+        )
         # Also check .pep and .aa extensions as fallbacks
         if not protein_fasta_paths:
             for ext in (".pep", ".aa", ".faa.gz", ".pep.gz"):
-                protein_fasta_paths = discover_annotation_files(
-                    prot_dir,
-                    suffix=ext,
-                    genome_ids=list(genome_paths.keys()),
-                ) if prot_dir.exists() else {}
+                protein_fasta_paths = (
+                    discover_annotation_files(
+                        prot_dir,
+                        suffix=ext,
+                        genome_ids=list(genome_paths.keys()),
+                    )
+                    if prot_dir.exists()
+                    else {}
+                )
                 if protein_fasta_paths:
                     break
 
@@ -412,8 +451,10 @@ def main():
             )
             intron_matrix = build_intron_matrix(
                 gff_paths=gff_paths,
-                genome_fasta_paths={gid: genome_paths[gid] for gid in gff_paths
-                                    if gid in genome_paths} or None,
+                genome_fasta_paths={
+                    gid: genome_paths[gid] for gid in gff_paths if gid in genome_paths
+                }
+                or None,
                 feature_types=tuple(intron_cfg.get("feature_types", ["exon"])),
                 ppt_window=intron_cfg.get("ppt_window", 20),
                 n_jobs=args.n_jobs,

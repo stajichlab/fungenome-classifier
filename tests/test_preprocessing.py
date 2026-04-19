@@ -6,16 +6,15 @@ Unit tests for preprocessing utilities.
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from fungal_classifier.utils.preprocessing import (
-    log1p_transform,
-    clr_transform,
     binarize_threshold,
-    impute_missing,
+    clr_transform,
     compute_class_weights,
-    encode_labels,
     correct_for_genome_size,
+    encode_labels,
+    impute_missing,
+    log1p_transform,
 )
 
 
@@ -24,11 +23,13 @@ def make_df(n=20, d=10, seed=0):
     ids = [f"g{i:04d}" for i in range(n)]
     return pd.DataFrame(
         np.abs(rng.standard_normal((n, d))).astype("float32"),
-        index=ids, columns=[f"f{j}" for j in range(d)]
+        index=ids,
+        columns=[f"f{j}" for j in range(d)],
     )
 
 
 # ── transforms ────────────────────────────────────────────────────────────────
+
 
 def test_log1p_non_negative():
     df = make_df()
@@ -67,6 +68,7 @@ def test_binarize():
 
 # ── imputation ────────────────────────────────────────────────────────────────
 
+
 def test_impute_zero():
     df = make_df()
     df.iloc[0, 0] = np.nan
@@ -86,6 +88,7 @@ def test_impute_median():
 
 # ── class weights ──────────────────────────────────────────────────────────────
 
+
 def test_compute_class_weights_balanced():
     y = pd.Series(["A"] * 90 + ["B"] * 10)
     weights = compute_class_weights(y)
@@ -99,6 +102,7 @@ def test_compute_class_weights_keys():
 
 
 # ── label encoding ────────────────────────────────────────────────────────────
+
 
 def test_encode_labels_basic():
     y = pd.Series(["cat", "dog", "cat", "bird"] * 10)
@@ -114,6 +118,7 @@ def test_encode_labels_collapses_rare():
 
 
 # ── genome size correction ────────────────────────────────────────────────────
+
 
 def test_correct_for_genome_size():
     df = pd.DataFrame({"domain_A": [100.0, 200.0]}, index=["g0", "g1"])

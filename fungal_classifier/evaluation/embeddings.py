@@ -16,15 +16,16 @@ import logging
 from pathlib import Path
 from typing import Literal
 
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
 logger = logging.getLogger(__name__)
 
 
 # ── dimensionality reduction ──────────────────────────────────────────────────
+
 
 def compute_pca_embedding(
     X: pd.DataFrame,
@@ -40,7 +41,7 @@ def compute_pca_embedding(
     coords = pca.fit_transform(arr)
     ev = pca.explained_variance_ratio_
 
-    cols = [f"PC{i+1}_({ev[i]:.1%})" for i in range(n_components)]
+    cols = [f"PC{i + 1}_({ev[i]:.1%})" for i in range(n_components)]
     df = pd.DataFrame(coords, index=X.index, columns=cols, dtype=np.float32)
     logger.info(f"PCA: {n_components} components, {ev[:2].sum():.1%} variance explained")
     return df
@@ -73,7 +74,7 @@ def compute_umap_embedding(
         verbose=False,
     )
     coords = reducer.fit_transform(arr)
-    cols = [f"UMAP{i+1}" for i in range(n_components)]
+    cols = [f"UMAP{i + 1}" for i in range(n_components)]
     return pd.DataFrame(coords, index=X.index, columns=cols, dtype=np.float32)
 
 
@@ -93,6 +94,7 @@ def compute_tsne_embedding(
     # Pre-reduce with PCA for speed
     if arr.shape[1] > 50:
         from sklearn.decomposition import PCA
+
         arr = PCA(n_components=50, random_state=random_state).fit_transform(arr)
 
     tsne = TSNE(
@@ -102,11 +104,12 @@ def compute_tsne_embedding(
         n_jobs=-1,
     )
     coords = tsne.fit_transform(arr)
-    cols = [f"tSNE{i+1}" for i in range(n_components)]
+    cols = [f"tSNE{i + 1}" for i in range(n_components)]
     return pd.DataFrame(coords, index=X.index, columns=cols, dtype=np.float32)
 
 
 # ── deep model tower embeddings ───────────────────────────────────────────────
+
 
 def extract_tower_embeddings(
     model,
@@ -128,7 +131,6 @@ def extract_tower_embeddings(
     """
     try:
         import torch
-        import torch.nn.functional as F
     except ImportError:
         raise ImportError("PyTorch required for tower embedding extraction")
 
@@ -183,6 +185,7 @@ def compute_fused_embedding(
 
 # ── visualisation ─────────────────────────────────────────────────────────────
 
+
 def plot_embedding(
     coords: pd.DataFrame,
     metadata: pd.DataFrame,
@@ -214,14 +217,18 @@ def plot_embedding(
         else plt.cm.hsv(np.linspace(0, 1, n_labels, endpoint=False))
     )
     color_map = dict(zip(unique_labels, palette))
-    colors = [color_map[l] for l in labels]
+    colors = [color_map[lbl] for lbl in labels]
 
     xcol, ycol = coords_c.columns[0], coords_c.columns[1]
 
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.scatter(
-        coords_c[xcol], coords_c[ycol],
-        c=colors, s=point_size, alpha=alpha, linewidths=0,
+        coords_c[xcol],
+        coords_c[ycol],
+        c=colors,
+        s=point_size,
+        alpha=alpha,
+        linewidths=0,
     )
     ax.set_xlabel(xcol)
     ax.set_ylabel(ycol)
@@ -229,10 +236,7 @@ def plot_embedding(
     ax.set_aspect("equal", "datalim")
 
     if n_labels <= max_legend_items:
-        handles = [
-            mpatches.Patch(color=color_map[l], label=l)
-            for l in unique_labels
-        ]
+        handles = [mpatches.Patch(color=color_map[lbl], label=lbl) for lbl in unique_labels]
         ax.legend(
             handles=handles,
             bbox_to_anchor=(1.02, 1),
@@ -276,10 +280,16 @@ def plot_embedding_grid(
         unique_labels = sorted(labels.unique())
         palette = plt.cm.tab20(np.linspace(0, 1, len(unique_labels)))
         color_map = dict(zip(unique_labels, palette))
-        colors = [color_map[l] for l in labels]
+        colors = [color_map[lbl] for lbl in labels]
 
-        ax.scatter(coords.loc[common, xcol], coords.loc[common, ycol],
-                   c=colors, s=8, alpha=0.6, linewidths=0)
+        ax.scatter(
+            coords.loc[common, xcol],
+            coords.loc[common, ycol],
+            c=colors,
+            s=8,
+            alpha=0.6,
+            linewidths=0,
+        )
         ax.set_title(col, fontsize=10)
         ax.set_xlabel(xcol, fontsize=8)
         ax.set_ylabel(ycol, fontsize=8)
@@ -296,6 +306,7 @@ def plot_embedding_grid(
 
 
 # ── export pipeline ───────────────────────────────────────────────────────────
+
 
 def run_embedding_export(
     feature_blocks: dict[str, pd.DataFrame],
@@ -350,7 +361,9 @@ def run_embedding_export(
 
                 # Plot grid
                 fig = plot_embedding_grid(
-                    coords, metadata, color_cols,
+                    coords,
+                    metadata,
+                    color_cols,
                     save_path=output_dir / f"{embed_name}_grid.svg",
                 )
                 plt.close(fig)
@@ -367,7 +380,9 @@ def run_embedding_export(
                 all_embeddings[f"deep_fusion_{method}"] = coords
                 coords.to_csv(output_dir / f"deep_fusion_{method}_coords.tsv", sep="\t")
                 fig = plot_embedding_grid(
-                    coords, metadata, color_cols,
+                    coords,
+                    metadata,
+                    color_cols,
                     save_path=output_dir / f"deep_fusion_{method}_grid.svg",
                 )
                 plt.close(fig)

@@ -19,13 +19,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fungal_classifier.features.kmer import build_kmer_matrix
 from fungal_classifier.features.domains import build_domain_matrix
+from fungal_classifier.features.kmer import build_kmer_matrix
 from fungal_classifier.features.repeats import build_repeat_matrix
-from fungal_classifier.models.fusion_model import StackingFusionModel
 from fungal_classifier.models.block_classifier import BlockClassifier
+from fungal_classifier.models.fusion_model import StackingFusionModel
 from fungal_classifier.utils.io import (
-    discover_genome_files, discover_annotation_files, save_predictions
+    discover_annotation_files,
+    discover_genome_files,
+    save_predictions,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -62,14 +64,16 @@ def main():
     # Build domain features if annotations available
     if args.annotation_dir:
         domain_paths = discover_annotation_files(
-            args.annotation_dir / "pfam", suffix=".domtblout",
+            args.annotation_dir / "pfam",
+            suffix=".domtblout",
             genome_ids=list(genome_paths.keys()),
         )
         if domain_paths:
             feature_blocks["domains"] = build_domain_matrix(domain_paths)
 
         repeat_paths = discover_annotation_files(
-            args.annotation_dir / "repeatmasker", suffix=".out",
+            args.annotation_dir / "repeatmasker",
+            suffix=".out",
             genome_ids=list(genome_paths.keys()),
         )
         if repeat_paths:

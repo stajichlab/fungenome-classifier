@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # ── upstream sequence extraction ──────────────────────────────────────────────
 
+
 def extract_upstream_sequences(
     genome_fasta: Path,
     gff_path: Path,
@@ -65,28 +66,36 @@ def extract_upstream_sequences(
 
     # Step 1: Extract gene features and compute upstream windows
     cmd_flank = [
-        "bedtools", "flank",
-        "-i", str(gff_path),
-        "-g", f"{genome_fasta}.fai",     # requires samtools faidx genome.fasta first
-        "-l", str(upstream_bp),
-        "-r", "0",
-        "-s",                             # strand-aware
+        "bedtools",
+        "flank",
+        "-i",
+        str(gff_path),
+        "-g",
+        f"{genome_fasta}.fai",  # requires samtools faidx genome.fasta first
+        "-l",
+        str(upstream_bp),
+        "-r",
+        "0",
+        "-s",  # strand-aware
     ]
 
     cmd_getfasta = [
-        "bedtools", "getfasta",
-        "-fi", str(genome_fasta),
-        "-bed", "stdin",
-        "-s",                             # strand-aware
+        "bedtools",
+        "getfasta",
+        "-fi",
+        str(genome_fasta),
+        "-bed",
+        "stdin",
+        "-s",  # strand-aware
         "-name",
-        "-fo", str(output_fasta),
+        "-fo",
+        str(output_fasta),
     ]
 
     try:
         p1 = subprocess.Popen(cmd_flank, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         p2 = subprocess.Popen(
-            cmd_getfasta, stdin=p1.stdout,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            cmd_getfasta, stdin=p1.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         p1.stdout.close()
         _, err2 = p2.communicate()
@@ -104,6 +113,7 @@ def extract_upstream_sequences(
 
 
 # ── FIMO scanning ─────────────────────────────────────────────────────────────
+
 
 def run_fimo(
     pwm_database: Path,
@@ -132,8 +142,10 @@ def run_fimo(
 
     cmd = [
         "fimo",
-        "--thresh", str(p_value_threshold),
-        "--oc", str(output_dir),
+        "--thresh",
+        str(p_value_threshold),
+        "--oc",
+        str(output_dir),
         "--no-qvalue",
         "--text",
         str(pwm_database),
@@ -156,6 +168,7 @@ def run_fimo(
 
 # ── FIMO output parsing ───────────────────────────────────────────────────────
 
+
 def parse_fimo_tsv(path: Path, p_value_threshold: float = 1e-4) -> pd.DataFrame:
     """
     Parse FIMO TSV output file.
@@ -168,7 +181,9 @@ def parse_fimo_tsv(path: Path, p_value_threshold: float = 1e-4) -> pd.DataFrame:
     """
     try:
         df = pd.read_csv(
-            path, sep="\t", comment="#",
+            path,
+            sep="\t",
+            comment="#",
             dtype={"p-value": float, "score": float},
         )
         # Drop footer lines FIMO sometimes writes
@@ -181,6 +196,7 @@ def parse_fimo_tsv(path: Path, p_value_threshold: float = 1e-4) -> pd.DataFrame:
 
 
 # ── feature aggregation ───────────────────────────────────────────────────────
+
 
 def fimo_hits_to_enrichment(
     fimo_df: pd.DataFrame,
@@ -262,6 +278,7 @@ def build_motif_matrix(
 
 # ── per-genome pipeline ───────────────────────────────────────────────────────
 
+
 def compute_motif_features_for_genome(
     genome_id: str,
     genome_fasta: Path,
@@ -284,9 +301,7 @@ def compute_motif_features_for_genome(
     # Extract promoters
     promoter_fasta = genome_work / "promoters.fasta"
     if not promoter_fasta.exists():
-        extract_upstream_sequences(
-            genome_fasta, gff_path, upstream_bp, promoter_fasta
-        )
+        extract_upstream_sequences(genome_fasta, gff_path, upstream_bp, promoter_fasta)
 
     # Count promoters
     opener = gzip.open if Path(promoter_fasta).suffix == ".gz" else open
@@ -346,8 +361,7 @@ def build_motif_matrix_from_genomes(
 
     genome_ids = sorted(set(genome_fastas) & set(gff_paths))
     results = Parallel(n_jobs=n_jobs)(
-        delayed(_process)(gid)
-        for gid in tqdm(genome_ids, desc="Motif pipeline")
+        delayed(_process)(gid) for gid in tqdm(genome_ids, desc="Motif pipeline")
     )
 
     rows = {gid: vec for gid, vec in results if not vec.empty}

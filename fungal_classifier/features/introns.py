@@ -52,6 +52,7 @@ def _rc(seq: str) -> str:
 
 # ── GFF3 parsing ──────────────────────────────────────────────────────────────
 
+
 def _parse_attributes(attr_str: str) -> dict[str, str]:
     """Parse GFF3 attribute column into a dict."""
     attrs: dict[str, str] = {}
@@ -136,8 +137,7 @@ def _parse_gff3_introns(
 
     if not exon_groups:
         logger.warning(
-            f"No exon/CDS features found in {gff_path}. "
-            f"Feature types seen: {sorted(types_seen)}"
+            f"No exon/CDS features found in {gff_path}. Feature types seen: {sorted(types_seen)}"
         )
         return []
 
@@ -151,15 +151,16 @@ def _parse_gff3_introns(
         # Sort by start coordinate
         exons_sorted = sorted(exons, key=lambda e: e[1])
         for i in range(len(exons_sorted) - 1):
-            e1_end = exons_sorted[i][2]      # 0-based half-open end of left exon
+            e1_end = exons_sorted[i][2]  # 0-based half-open end of left exon
             e2_start = exons_sorted[i + 1][1]  # 0-based start of right exon
-            if e2_start > e1_end:            # genuine gap (not overlapping/adjacent)
+            if e2_start > e1_end:  # genuine gap (not overlapping/adjacent)
                 introns.append((chrom, e1_end, e2_start, strand))
 
     return introns
 
 
 # ── genome loading ─────────────────────────────────────────────────────────────
+
 
 def _load_genome_index(fasta_path: Path) -> dict[str, str]:
     """Load all scaffold sequences into a dict: id -> sequence string."""
@@ -171,6 +172,7 @@ def _load_genome_index(fasta_path: Path) -> dict[str, str]:
 
 
 # ── splice site extraction ────────────────────────────────────────────────────
+
 
 def _donor_acceptor(
     genome: dict[str, str],
@@ -193,18 +195,18 @@ def _donor_acceptor(
         return ("", "", None)
 
     if strand == "+":
-        donor = seq[intron_start: intron_start + 2]
-        acceptor = seq[intron_end - 2: intron_end]
+        donor = seq[intron_start : intron_start + 2]
+        acceptor = seq[intron_end - 2 : intron_end]
         if intron_len >= ppt_window + 2:
-            tract = seq[intron_end - ppt_window - 2: intron_end - 2]
+            tract = seq[intron_end - ppt_window - 2 : intron_end - 2]
             ppt = (tract.count("C") + tract.count("T")) / max(len(tract), 1)
         else:
             ppt = None
     else:  # minus strand — donor is at the HIGH coordinate end
-        donor = _rc(seq[intron_end - 2: intron_end])
-        acceptor = _rc(seq[intron_start: intron_start + 2])
+        donor = _rc(seq[intron_end - 2 : intron_end])
+        acceptor = _rc(seq[intron_start : intron_start + 2])
         if intron_len >= ppt_window + 2:
-            tract = _rc(seq[intron_start + 2: intron_start + 2 + ppt_window])
+            tract = _rc(seq[intron_start + 2 : intron_start + 2 + ppt_window])
             ppt = (tract.count("C") + tract.count("T")) / max(len(tract), 1)
         else:
             ppt = None
@@ -213,6 +215,7 @@ def _donor_acceptor(
 
 
 # ── per-genome feature computation ───────────────────────────────────────────
+
 
 def compute_intron_features(
     gff_path: Path,
@@ -301,20 +304,16 @@ def compute_intron_features(
 
         # Canonical GT-AG and minor AT-AC
         gtag = sum(
-            1 for d, a in zip(donors, acceptors)
-            if d[:2].upper() == "GT" and a[-2:].upper() == "AG"
+            1 for d, a in zip(donors, acceptors) if d[:2].upper() == "GT" and a[-2:].upper() == "AG"
         )
         atac = sum(
-            1 for d, a in zip(donors, acceptors)
-            if d[:2].upper() == "AT" and a[-2:].upper() == "AC"
+            1 for d, a in zip(donors, acceptors) if d[:2].upper() == "AT" and a[-2:].upper() == "AC"
         )
         features["canonical_GTAG_fraction"] = gtag / n
         features["atac_fraction"] = atac / n
         features["noncanonical_fraction"] = (n - gtag - atac) / n
 
-        features["polypyrimidine_score"] = (
-            float(np.mean(ppt_scores)) if ppt_scores else 0.0
-        )
+        features["polypyrimidine_score"] = float(np.mean(ppt_scores)) if ppt_scores else 0.0
 
     return pd.Series(features, dtype=np.float32)
 
@@ -370,6 +369,7 @@ def _count_gene_stats(
 
 # ── matrix builder ────────────────────────────────────────────────────────────
 
+
 def build_intron_matrix(
     gff_paths: dict[str, Path],
     genome_fasta_paths: dict[str, Path] | None = None,
@@ -411,8 +411,7 @@ def build_intron_matrix(
             return genome_id, pd.Series(dtype=np.float32)
 
     results = Parallel(n_jobs=n_jobs)(
-        delayed(_process)(gid)
-        for gid in tqdm(sorted(gff_paths), desc="Intron features")
+        delayed(_process)(gid) for gid in tqdm(sorted(gff_paths), desc="Intron features")
     )
 
     rows = {gid: vec for gid, vec in results if not vec.empty}

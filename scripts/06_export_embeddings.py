@@ -25,12 +25,13 @@ import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fungal_classifier.utils.io import load_metadata, load_feature_blocks
 from fungal_classifier.evaluation.embeddings import run_embedding_export
+from fungal_classifier.utils.io import load_feature_blocks, load_metadata
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -42,16 +43,25 @@ def parse_args():
     p.add_argument("--metadata", type=Path, required=True)
     p.add_argument("--output-dir", type=Path, default=Path("results/embeddings"))
     p.add_argument("--model-dir", type=Path, help="Path to results dir (for deep model)")
-    p.add_argument("--methods", nargs="+", default=["pca", "umap"],
-                   choices=["pca", "umap", "tsne"],
-                   help="Embedding methods to compute")
-    p.add_argument("--blocks", nargs="+", default=None,
-                   help="Subset of blocks to embed (default: all)")
-    p.add_argument("--color-by", nargs="+",
-                   default=["taxonomy_order", "taxonomy_class", "ecological_niche", "lifestyle"],
-                   help="Metadata columns for colouring scatter plots")
-    p.add_argument("--deep", action="store_true",
-                   help="Also extract tower embeddings from trained deep model")
+    p.add_argument(
+        "--methods",
+        nargs="+",
+        default=["pca", "umap"],
+        choices=["pca", "umap", "tsne"],
+        help="Embedding methods to compute",
+    )
+    p.add_argument(
+        "--blocks", nargs="+", default=None, help="Subset of blocks to embed (default: all)"
+    )
+    p.add_argument(
+        "--color-by",
+        nargs="+",
+        default=["taxonomy_order", "taxonomy_class", "ecological_niche", "lifestyle"],
+        help="Metadata columns for colouring scatter plots",
+    )
+    p.add_argument(
+        "--deep", action="store_true", help="Also extract tower embeddings from trained deep model"
+    )
     return p.parse_args()
 
 
@@ -76,9 +86,10 @@ def main():
         if deep_pt.exists():
             try:
                 import torch
-                from fungal_classifier.models.deep_fusion import DeepFusionClassifier
                 from sklearn.decomposition import TruncatedSVD
                 from sklearn.preprocessing import StandardScaler
+
+                from fungal_classifier.models.deep_fusion import DeepFusionClassifier
 
                 # Rebuild reduced blocks for deep model input
                 svd_k = 150
@@ -89,8 +100,7 @@ def main():
                     k = min(svd_k, arr.shape[1] - 1)
                     arr_r = TruncatedSVD(n_components=k, random_state=42).fit_transform(arr)
                     deep_blocks[name] = __import__("pandas").DataFrame(
-                        arr_r, index=df.index,
-                        columns=[f"svd_{i}" for i in range(k)]
+                        arr_r, index=df.index, columns=[f"svd_{i}" for i in range(k)]
                     )
                     block_dims[name] = k
 
@@ -99,8 +109,11 @@ def main():
                 le = checkpoint.get("label_encoder")
                 n_classes = len(le.classes_) if le else 10
                 deep_model = DeepFusionClassifier(
-                    block_dims=block_dims, n_classes=n_classes,
-                    hidden_dim=256, embedding_dim=128, fusion="attention",
+                    block_dims=block_dims,
+                    n_classes=n_classes,
+                    hidden_dim=256,
+                    embedding_dim=128,
+                    fusion="attention",
                 )
                 deep_model.load_state_dict(checkpoint["model_state"])
                 deep_model.eval()
@@ -121,7 +134,9 @@ def main():
     )
 
     logger.info(f"\nEmbedding export complete. Files saved to: {args.output_dir}")
-    logger.info("Coordinate TSVs can be loaded directly into R (ggplot2) or used for iTOL tree annotation.")
+    logger.info(
+        "Coordinate TSVs can be loaded directly into R (ggplot2) or used for iTOL tree annotation."
+    )
 
 
 if __name__ == "__main__":

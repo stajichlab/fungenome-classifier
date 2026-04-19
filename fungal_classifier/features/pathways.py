@@ -15,9 +15,7 @@ from __future__ import annotations
 import gzip
 import json
 import logging
-import re
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -27,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── KEGG ──────────────────────────────────────────────────────────────────────
+
 
 def parse_kegg_annotation(path: Path) -> pd.Series:
     """
@@ -84,6 +83,7 @@ def build_kegg_matrix(
 
 # ── CAZyme ────────────────────────────────────────────────────────────────────
 
+
 def parse_dbcan_output(path: Path, min_tools: int = 2) -> pd.Series:
     """
     Parse dbCAN overview.txt output.
@@ -128,6 +128,7 @@ def build_cazyme_matrix(
 
 # ── BGC (antiSMASH) ───────────────────────────────────────────────────────────
 
+
 def parse_antismash_json(path: Path) -> pd.Series:
     """
     Parse antiSMASH JSON output file.
@@ -166,6 +167,7 @@ def build_bgc_matrix(
 
 
 # ── GO terms ──────────────────────────────────────────────────────────────────
+
 
 def aggregate_go_terms(
     go_term_counts: pd.Series,

@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ── parsers ───────────────────────────────────────────────────────────────────
 
+
 def parse_domtblout(path: Path, e_value_threshold: float = 1e-5) -> pd.DataFrame:
     """
     Parse hmmer --domtblout file into a tidy DataFrame.
@@ -40,7 +41,7 @@ def parse_domtblout(path: Path, e_value_threshold: float = 1e-5) -> pd.DataFrame
             #                    qlen, full_evalue, full_score, ...
             try:
                 protein_id = parts[0]
-                domain_acc = parts[4].split(".")[0]   # strip version e.g. PF00001.1 -> PF00001
+                domain_acc = parts[4].split(".")[0]  # strip version e.g. PF00001.1 -> PF00001
                 domain_name = parts[3]
                 e_value = float(parts[6])
                 score = float(parts[7])
@@ -68,19 +69,30 @@ def parse_interpro_tsv(path: Path) -> pd.DataFrame:
       start, end, score, status, date, ipr_acc, ipr_desc, go_terms, pathways
     """
     cols = [
-        "protein_id", "md5", "length", "analysis", "domain_acc",
-        "domain_name", "start", "end", "e_value", "status", "date",
-        "ipr_acc", "ipr_desc", "go_terms", "pathways",
+        "protein_id",
+        "md5",
+        "length",
+        "analysis",
+        "domain_acc",
+        "domain_name",
+        "start",
+        "end",
+        "e_value",
+        "status",
+        "date",
+        "ipr_acc",
+        "ipr_desc",
+        "go_terms",
+        "pathways",
     ]
-    df = pd.read_csv(
-        path, sep="\t", header=None, names=cols, low_memory=False
-    )
+    df = pd.read_csv(path, sep="\t", header=None, names=cols, low_memory=False)
     df = df[df["e_value"].apply(lambda x: str(x) != "-")]
     df["e_value"] = pd.to_numeric(df["e_value"], errors="coerce")
     return df[["protein_id", "domain_acc", "domain_name", "e_value"]]
 
 
 # ── feature building ──────────────────────────────────────────────────────────
+
 
 def _domains_to_vector(
     domain_df: pd.DataFrame,
@@ -146,7 +158,6 @@ def build_domain_matrix(
     matrix = matrix.fillna(0.0).astype(np.float32)
 
     # Filter rare domains
-    n_genomes = len(matrix)
     freq = (matrix > 0).mean(axis=0)
     keep = freq[freq >= min_genome_freq].index
     matrix = matrix[keep]

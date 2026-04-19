@@ -32,13 +32,16 @@ logger = logging.getLogger(__name__)
 
 # ── tree utilities ────────────────────────────────────────────────────────────
 
+
 def load_tree(newick_path: str):
     """Load a phylogenetic tree from a Newick file using ete3."""
     try:
         from ete3 import Tree
+
         return Tree(newick_path, format=1)
     except ImportError:
         import dendropy
+
         return dendropy.Tree.get(path=newick_path, schema="newick")
 
 
@@ -51,7 +54,6 @@ def get_patristic_distances(tree, genome_ids: list[str]) -> pd.DataFrame:
     pd.DataFrame of shape (n, n) with genome_ids as index and columns.
     """
     try:
-        from ete3 import Tree
         tips = {leaf.name: leaf for leaf in tree.iter_leaves()}
         n = len(genome_ids)
         D = np.zeros((n, n))
@@ -62,7 +64,6 @@ def get_patristic_distances(tree, genome_ids: list[str]) -> pd.DataFrame:
                     D[i, j] = D[j, i] = dist
         return pd.DataFrame(D, index=genome_ids, columns=genome_ids)
     except ImportError:
-        import dendropy
         pdm = tree.phylogenetic_distance_matrix()
         taxa = {t.label: t for t in tree.taxon_namespace}
         n = len(genome_ids)
@@ -101,11 +102,12 @@ def phylogenetic_eigenvectors(
         normalized_stress=False,
     )
     coords = mds.fit_transform(D)
-    cols = [f"phylo_pc{i+1}" for i in range(n_components)]
+    cols = [f"phylo_pc{i + 1}" for i in range(n_components)]
     return pd.DataFrame(coords, index=genome_ids, columns=cols, dtype=np.float32)
 
 
 # ── clade assignment ──────────────────────────────────────────────────────────
+
 
 def assign_clades_from_taxonomy(
     metadata: pd.DataFrame,
@@ -126,7 +128,9 @@ def assign_clades_from_taxonomy(
     """
     col = f"taxonomy_{clade_level}"
     if col not in metadata.columns:
-        raise ValueError(f"Column '{col}' not found in metadata. Available: {list(metadata.columns)}")
+        raise ValueError(
+            f"Column '{col}' not found in metadata. Available: {list(metadata.columns)}"
+        )
     return metadata[col].fillna("Unknown")
 
 
@@ -144,7 +148,6 @@ def assign_clades_from_tree(
     pd.Series mapping genome_id -> clade_id (integer).
     """
     try:
-        from ete3 import Tree
         # Collect internal nodes sorted by number of leaves
         internal_nodes = sorted(
             [n for n in tree.traverse() if not n.is_leaf()],
@@ -163,10 +166,13 @@ def assign_clades_from_tree(
                 clade_assignments[gid] = -1
         return pd.Series(clade_assignments)
     except ImportError:
-        raise ImportError("ete3 is required for tree-based clade assignment. Install with: pip install ete3")
+        raise ImportError(
+            "ete3 is required for tree-based clade assignment. Install with: pip install ete3"
+        )
 
 
 # ── cross-validation splitter ─────────────────────────────────────────────────
+
 
 class CladeHoldoutCV:
     """
@@ -203,7 +209,6 @@ class CladeHoldoutCV:
     def _build_fold_assignments(self) -> None:
         """Distribute clades across folds (approximately equal genome count)."""
         rng = np.random.default_rng(self.random_seed)
-        clades = self.clade_labels.unique()
         # Sort by size descending, then distribute round-robin for balance
         clade_sizes = self.clade_labels.value_counts()
         sorted_clades = clade_sizes.index.tolist()
@@ -242,10 +247,9 @@ class CladeHoldoutCV:
 
         for fold in range(self.n_folds):
             test_genomes = [
-                gid for gid in genome_ids
-                if self._clade_to_fold.get(
-                    self.clade_labels.get(gid, "Unknown"), -1
-                ) == fold
+                gid
+                for gid in genome_ids
+                if self._clade_to_fold.get(self.clade_labels.get(gid, "Unknown"), -1) == fold
             ]
             train_genomes = [gid for gid in genome_ids if gid not in set(test_genomes)]
 
@@ -256,9 +260,7 @@ class CladeHoldoutCV:
                 logger.warning(f"Fold {fold} has no test samples — skipping.")
                 continue
 
-            logger.info(
-                f"Fold {fold}: {len(train_idx)} train, {len(test_idx)} test genomes"
-            )
+            logger.info(f"Fold {fold}: {len(train_idx)} train, {len(test_idx)} test genomes")
             yield train_idx, test_idx
 
     def get_n_splits(self, X=None, y=None, groups=None) -> int:
@@ -274,6 +276,7 @@ class CladeHoldoutCV:
 
 
 # ── phylogenetic signal test ──────────────────────────────────────────────────
+
 
 def blombergs_k(
     trait: pd.Series,
@@ -299,7 +302,6 @@ def blombergs_k(
     trait = trait.loc[common].astype(float)
     D = distance_matrix.loc[common, common].values
 
-    n = len(trait)
     y = trait.values - trait.mean()
 
     # Variance of independent contrasts (simplified)

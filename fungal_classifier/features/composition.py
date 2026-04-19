@@ -36,16 +36,16 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 # Standard genetic code (NCBI table 1)
-_STD_TABLE   = CodonTable.unambiguous_dna_by_id[1]
+_STD_TABLE = CodonTable.unambiguous_dna_by_id[1]
 SENSE_CODONS = sorted(
-    c for c in itertools.product("ACGT", repeat=3)
-    if "".join(c) not in _STD_TABLE.stop_codons
+    c for c in itertools.product("ACGT", repeat=3) if "".join(c) not in _STD_TABLE.stop_codons
 )
-SENSE_CODONS = ["".join(c) for c in SENSE_CODONS]   # 61 codons
-AMINO_ACIDS  = sorted(set(_STD_TABLE.forward_table.values()))  # 20 AAs
+SENSE_CODONS = ["".join(c) for c in SENSE_CODONS]  # 61 codons
+AMINO_ACIDS = sorted(set(_STD_TABLE.forward_table.values()))  # 20 AAs
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _open(path: Path):
     path = Path(path)
@@ -57,7 +57,7 @@ def _count_codons(seq: str) -> dict[str, int]:
     seq = seq.upper()
     counts: dict[str, int] = {c: 0 for c in SENSE_CODONS}
     for i in range(0, len(seq) - 2, 3):
-        codon = seq[i: i + 3]
+        codon = seq[i : i + 3]
         if codon in counts:
             counts[codon] += 1
     return counts
@@ -86,6 +86,7 @@ def _gc_positions(codon_counts: dict[str, int]) -> tuple[float, float, float]:
 
 
 # ── parsers ───────────────────────────────────────────────────────────────────
+
 
 def parse_codon_freq_csv(path: Path) -> pd.Series:
     """
@@ -169,6 +170,7 @@ def compute_features_from_protein_fasta(path: Path) -> pd.Series:
 
 # ── matrix builders ───────────────────────────────────────────────────────────
 
+
 def build_composition_matrix_from_csvs(
     codon_csv_paths: dict[str, Path],
     cds_fasta_paths: dict[str, Path] | None = None,
@@ -187,7 +189,6 @@ def build_composition_matrix_from_csvs(
 
             # Derive AA frequencies from codon table
             codon_counts = {c: codon_series.get(c, 0.0) for c in SENSE_CODONS}
-            total = sum(codon_counts.values()) or 1
             codon_counts_int = {c: codon_counts[c] * 1000 for c in codon_counts}  # pseudo-counts
             aa_freqs = _codons_to_aa(codon_counts_int)
             for aa, freq in aa_freqs.items():
@@ -202,9 +203,7 @@ def build_composition_matrix_from_csvs(
             # Gene count from FASTA if available
             if cds_fasta_paths and genome_id in cds_fasta_paths:
                 with _open(cds_fasta_paths[genome_id]) as fh:
-                    features["gene_count"] = float(
-                        sum(1 for r in SeqIO.parse(fh, "fasta"))
-                    )
+                    features["gene_count"] = float(sum(1 for r in SeqIO.parse(fh, "fasta")))
 
             rows[genome_id] = pd.Series(features, dtype=np.float32)
         except Exception as e:

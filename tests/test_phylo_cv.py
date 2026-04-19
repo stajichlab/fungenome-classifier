@@ -6,7 +6,6 @@ Unit tests for phylogeny-aware cross-validation.
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from fungal_classifier.evaluation.phylo_cv import CladeHoldoutCV, assign_clades_from_taxonomy
 
@@ -17,7 +16,9 @@ def make_mock_metadata(n=100):
     return pd.DataFrame(
         {
             "taxonomy_order": np.random.choice(orders, size=n),
-            "ecological_niche": np.random.choice(["saprotrophic", "mycorrhizal", "pathogenic"], size=n),
+            "ecological_niche": np.random.choice(
+                ["saprotrophic", "mycorrhizal", "pathogenic"], size=n
+            ),
         },
         index=pd.Index(genome_ids, name="genome_id"),
     )
@@ -63,7 +64,6 @@ def test_clade_holdout_cv_coverage():
 def test_fold_summary_returns_dataframe():
     meta = make_mock_metadata(100)
     clade_labels = assign_clades_from_taxonomy(meta, clade_level="order")
-    X = pd.DataFrame(np.random.randn(100, 5), index=meta.index)
     cv = CladeHoldoutCV(clade_labels=clade_labels, n_folds=5)
     summary = cv.fold_summary()
     assert isinstance(summary, pd.DataFrame)

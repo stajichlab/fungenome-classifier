@@ -16,14 +16,15 @@ import logging
 from pathlib import Path
 from typing import Literal
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
 
 # ── SHAP computation ──────────────────────────────────────────────────────────
+
 
 def compute_shap_values(
     classifier,
@@ -110,16 +111,19 @@ def per_class_shap_summary(
         mean_abs = np.abs(sv).mean(axis=0)
         ranked = np.argsort(mean_abs)[::-1][:top_n]
         for rank, feat_idx in enumerate(ranked):
-            rows.append({
-                "class": cls_name,
-                "rank": rank + 1,
-                "feature": feature_names[feat_idx],
-                "mean_abs_shap": float(mean_abs[feat_idx]),
-            })
+            rows.append(
+                {
+                    "class": cls_name,
+                    "rank": rank + 1,
+                    "feature": feature_names[feat_idx],
+                    "mean_abs_shap": float(mean_abs[feat_idx]),
+                }
+            )
     return pd.DataFrame(rows)
 
 
 # ── block-level attribution ───────────────────────────────────────────────────
+
 
 def block_level_importance(
     mean_abs_shap: pd.Series,
@@ -148,6 +152,7 @@ def block_level_importance(
 
 # ── visualization ─────────────────────────────────────────────────────────────
 
+
 def plot_shap_summary(
     shap_values: np.ndarray,
     X: pd.DataFrame,
@@ -172,10 +177,7 @@ def plot_shap_summary(
         ax.set_xlabel("Mean |SHAP|")
         ax.set_title(title)
     else:
-        shap.summary_plot(
-            shap_values, X, max_display=max_display,
-            show=False, plot_type="dot"
-        )
+        shap.summary_plot(shap_values, X, max_display=max_display, show=False, plot_type="dot")
         fig = plt.gcf()
         fig.suptitle(title)
 
@@ -195,8 +197,9 @@ def plot_block_contributions(
     colors = ["#1a6fa8", "#e8722a", "#2ca02c", "#d62728", "#9467bd"]
     fig, ax = plt.subplots(figsize=(8, 4))
     block_importance.sort_values().plot(
-        kind="barh", ax=ax,
-        color=colors[:len(block_importance)],
+        kind="barh",
+        ax=ax,
+        color=colors[: len(block_importance)],
     )
     ax.set_xlabel("Total Mean |SHAP|")
     ax.set_title(title)
@@ -220,6 +223,7 @@ def plot_per_class_heatmap(
     )
     fig, ax = plt.subplots(figsize=(max(8, len(pivot.columns) * 1.2), max(6, len(pivot) * 0.4)))
     import seaborn as sns
+
     sns.heatmap(pivot, ax=ax, cmap="YlOrRd", linewidths=0.5)
     ax.set_title("SHAP Importance by Class and Feature")
     plt.tight_layout()
@@ -230,9 +234,10 @@ def plot_per_class_heatmap(
 
 # ── full SHAP analysis pipeline ───────────────────────────────────────────────
 
+
 def run_shap_analysis(
-    block_classifiers: dict,   # block_name -> BlockClassifier
-    feature_blocks: dict,      # block_name -> pd.DataFrame
+    block_classifiers: dict,  # block_name -> BlockClassifier
+    feature_blocks: dict,  # block_name -> pd.DataFrame
     class_names: list[str],
     output_dir: Path,
     top_n: int = 20,
@@ -279,7 +284,9 @@ def run_shap_analysis(
             class_summary.to_csv(output_dir / f"{block_name}_per_class_shap.csv", index=False)
 
         plot_shap_summary(
-            shap_values, X, max_display=top_n,
+            shap_values,
+            X,
+            max_display=top_n,
             title=f"SHAP: {block_name}",
             save_path=output_dir / f"{block_name}_shap_summary.svg",
         )

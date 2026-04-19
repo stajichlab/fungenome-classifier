@@ -22,11 +22,12 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-DISORDER_THRESHOLD = 0.5   # residues above this are considered disordered
-IDR_MIN_LENGTH     = 10    # consecutive disordered residues to call a long IDR
+DISORDER_THRESHOLD = 0.5  # residues above this are considered disordered
+IDR_MIN_LENGTH = 10  # consecutive disordered residues to call a long IDR
 
 
 # ── parser ────────────────────────────────────────────────────────────────────
+
 
 def parse_aiupred(path: Path) -> pd.DataFrame:
     """
@@ -55,18 +56,21 @@ def parse_aiupred(path: Path) -> pd.DataFrame:
             if len(parts) < 3 or current_protein is None:
                 continue
             try:
-                records.append({
-                    "protein_id": current_protein,
-                    "position":   int(parts[0]),
-                    "residue":    parts[1],
-                    "disorder":   float(parts[2]),
-                })
+                records.append(
+                    {
+                        "protein_id": current_protein,
+                        "position": int(parts[0]),
+                        "residue": parts[1],
+                        "disorder": float(parts[2]),
+                    }
+                )
             except (IndexError, ValueError):
                 continue
     return pd.DataFrame(records)
 
 
 # ── feature aggregation ───────────────────────────────────────────────────────
+
 
 def _has_long_idr(scores: pd.Series, threshold: float, min_len: int) -> bool:
     """Return True if the protein has a run of >= min_len disordered residues."""
@@ -103,7 +107,7 @@ def aiupred_to_features(
 
     all_scores = df["disorder"]
     features: dict[str, float] = {
-        "aiupred_mean_disorder":   float(all_scores.mean()),
+        "aiupred_mean_disorder": float(all_scores.mean()),
         "aiupred_median_disorder": float(all_scores.median()),
         "aiupred_frac_disordered": float((all_scores >= threshold).mean()),
     }
@@ -111,15 +115,13 @@ def aiupred_to_features(
     protein_groups = df.groupby("protein_id")["disorder"]
     n_proteins = protein_groups.ngroups
 
-    has_any_idr  = protein_groups.apply(lambda s: (s >= threshold).any()).sum()
-    has_long_idr = protein_groups.apply(
-        lambda s: _has_long_idr(s, threshold, idr_min_length)
-    ).sum()
+    has_any_idr = protein_groups.apply(lambda s: (s >= threshold).any()).sum()
+    has_long_idr = protein_groups.apply(lambda s: _has_long_idr(s, threshold, idr_min_length)).sum()
     per_protein_mean = protein_groups.mean()
 
-    features["aiupred_frac_proteins_idr"]      = float(has_any_idr) / max(n_proteins, 1)
+    features["aiupred_frac_proteins_idr"] = float(has_any_idr) / max(n_proteins, 1)
     features["aiupred_frac_proteins_long_idr"] = float(has_long_idr) / max(n_proteins, 1)
-    features["aiupred_mean_protein_disorder"]  = float(per_protein_mean.mean())
+    features["aiupred_mean_protein_disorder"] = float(per_protein_mean.mean())
 
     return pd.Series(features, dtype=np.float32)
 

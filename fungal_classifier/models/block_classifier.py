@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ── block classifier ──────────────────────────────────────────────────────────
 
+
 class BlockClassifier(BaseEstimator, ClassifierMixin):
     """
     Wraps XGBoost or LightGBM as a per-block classifier.
@@ -68,6 +69,7 @@ class BlockClassifier(BaseEstimator, ClassifierMixin):
     def _build_model(self, n_classes: int):
         if self.model_type == "xgboost":
             import xgboost as xgb
+
             objective = "multi:softprob" if n_classes > 2 else "binary:logistic"
             return xgb.XGBClassifier(
                 n_estimators=self.n_estimators,
@@ -85,19 +87,21 @@ class BlockClassifier(BaseEstimator, ClassifierMixin):
             )
         elif self.model_type == "lightgbm":
             import lightgbm as lgb
+
             return lgb.LGBMClassifier(
                 n_estimators=self.n_estimators,
                 max_depth=self.max_depth,
                 learning_rate=self.learning_rate,
                 subsample=self.subsample,
                 colsample_bytree=self.colsample,
-                num_leaves=2 ** self.max_depth - 1,
+                num_leaves=2**self.max_depth - 1,
                 random_state=self.random_seed,
                 verbose=-1,
                 n_jobs=-1,
             )
         elif self.model_type == "random_forest":
             from sklearn.ensemble import RandomForestClassifier
+
             return RandomForestClassifier(
                 n_estimators=self.n_estimators,
                 max_depth=self.max_depth if self.max_depth > 0 else None,
@@ -132,7 +136,8 @@ class BlockClassifier(BaseEstimator, ClassifierMixin):
             X_val, y_val = eval_set
             y_val_enc = self._label_encoder.transform(y_val)
             self._model.fit(
-                X.values, y_enc,
+                X.values,
+                y_enc,
                 eval_set=[(X_val.values, y_val_enc)],
                 verbose=False,
             )
@@ -177,6 +182,7 @@ class BlockClassifier(BaseEstimator, ClassifierMixin):
 
 # ── block-wise training loop ──────────────────────────────────────────────────
 
+
 def train_all_blocks(
     feature_blocks: dict[str, pd.DataFrame],
     y: pd.Series,
@@ -207,7 +213,7 @@ def train_all_blocks(
     results: dict[str, dict] = {}
 
     for block_name, X_block in feature_blocks.items():
-        logger.info(f"\n{'='*50}\nBlock: {block_name}")
+        logger.info(f"\n{'=' * 50}\nBlock: {block_name}")
 
         # Align labels to block genome IDs
         common_ids = X_block.index.intersection(y.index)
