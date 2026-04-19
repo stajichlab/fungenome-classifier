@@ -42,3 +42,6 @@ htmlcov/
 # Logs
 *.log
 logs/
+# pixi environments
+.pixi/*
+!.pixi/config.toml

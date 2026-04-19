@@ -12,6 +12,7 @@ Computes:
 
 from __future__ import annotations
 
+import gzip
 import logging
 from pathlib import Path
 from typing import Literal
@@ -47,7 +48,8 @@ def parse_rmout(path: Path) -> pd.DataFrame:
       r_left, ID, [*]
     """
     records = []
-    with open(path) as fh:
+    opener = gzip.open if Path(path).suffix == ".gz" else open
+    with opener(path, "rt") as fh:
         for _ in range(3):  # skip 3 header lines
             next(fh)
         for line in fh:
@@ -92,7 +94,8 @@ def parse_rmout(path: Path) -> pd.DataFrame:
 def get_genome_size_from_fai(fai_path: Path) -> int:
     """Read total genome size (bp) from a FASTA .fai index file."""
     total = 0
-    with open(fai_path) as fh:
+    opener = gzip.open if Path(fai_path).suffix == ".gz" else open
+    with opener(fai_path, "rt") as fh:
         for line in fh:
             parts = line.strip().split("\t")
             if len(parts) >= 2:

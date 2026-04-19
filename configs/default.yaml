@@ -44,6 +44,40 @@ features:
     p_value_threshold: 1.0e-4
     upstream_bp: 1000               # promoter window upstream of TSS
 
+  subcellular:
+    enabled: true                   # TMHMM, SignalP, WolfPSORT, TargetP combined
+
+  disorder:
+    enabled: true                   # AIUPred intrinsic disorder scores
+    threshold: 0.5                  # residue disorder score cutoff
+    idr_min_length: 10              # min consecutive disordered residues for long IDR
+
+  proteases:
+    enabled: true                   # MEROPS BLAST results
+    min_identity: 30.0              # minimum BLAST % identity
+    min_align_len: 50               # minimum alignment length (aa)
+    max_evalue: 1.0e-5
+    min_genome_freq: 0.01
+
+  genomic:
+    enabled: true                   # genome length, N50, scaffold count, GC, protein length stats
+    # Genome assembly FASTAs are read from --genome-dir (same as k-mer block)
+    # Protein FASTAs are looked up in --annotation-dir/proteins/ (.faa/.pep/.aa)
+
+  introns:
+    enabled: true                   # intron lengths, counts, splice sites, PPT score
+    # GFF3 files: --annotation-dir/gff/{genome_id}.gff3[.gz]
+    # Genome FASTAs: matched from --genome-dir by genome_id (enables splice site features)
+    feature_types: [exon]           # GFF3 feature type(s) to use as exon anchors; falls back to CDS
+    ppt_window: 20                  # bp upstream of 3' acceptor for polypyrimidine tract scoring
+
+  composition:
+    enabled: true                   # codon usage, AA frequency, gene count
+    # Source preference: codon_freq_csv > cds_fasta > protein_fasta
+    # Files expected in annotations/cds/:
+    #   {genome_id}.cds-transcripts.codon_freq.csv  (pre-computed)
+    #   {genome_id}.cds-transcripts.fa[.gz]          (raw CDS FASTA)
+
 # ── Feature selection ──────────────────────────────────────────────────────────
 feature_selection:
   method: variance_threshold        # applied per block before fusion

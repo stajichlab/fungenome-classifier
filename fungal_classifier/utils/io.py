@@ -6,13 +6,23 @@ Data loading, saving, and path management utilities.
 
 from __future__ import annotations
 
+import gzip
 import logging
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+
+def open_text(path: Path):
+    """Open a file for text reading, transparently decompressing .gz files."""
+    path = Path(path)
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt")
+    return open(path)
 
 
 # ── metadata ──────────────────────────────────────────────────────────────────
@@ -28,6 +38,99 @@ def load_metadata(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path, sep="\t", index_col="genome_id", low_memory=False)
     logger.info(f"Loaded metadata: {df.shape[0]} genomes, {df.shape[1]} columns")
     return df
+
+
+# ── taxonomy ──────────────────────────────────────────────────────────────────
+
+def load_taxonomy(path: Path) -> pd.DataFrame:
+    """
+    Load the samples.csv taxonomy table.
+
+    Expected columns (comma-separated):
+      ASMID, SPECIESIN, STRAIN, BIOPROJECT, NCBI_TAXONID, BUSCO_LINEAGE,
+      PHYLUM, SUBPHYLUM, CLASS, SUBCLASS, ORDER, FAMILY, GENUS, SPECIES,
+      LOCUSTAG
+
+    Returns a DataFrame indexed by ASMID with standardised lower-case column
+    names.  A 'locustag' column is preserved for joining to annotation files
+    whose protein IDs are prefixed with the locus tag.
+    """
+    df = pd.read_csv(path, dtype=str)
+    df.columns = [c.strip().lower() for c in df.columns]
+    df = df.rename(columns={"asmid": "genome_id"})
+    df = df.set_index("genome_id")
+    logger.info(
+        f"Loaded taxonomy: {df.shape[0]} assemblies, "
+        f"{df.shape[1]} columns; "
+        f"{df['phylum'].nunique()} phyla"
+    )
+    return df
+
+
+def validate_species_prefixes(
+    taxonomy_path: Path,
+    annotation_dir: Path,
+) -> dict[str, bool]:
+    """
+    Check that each entry in samples.csv has annotation files in annotation_dir.
+    The expected prefix is built as ``{SPECIES}_{STRAIN}`` with whitespace
+    replaced by '_' in each column.
+
+    Returns a dict mapping expected_prefix -> found (bool).  Logs a warning for
+    every prefix with no matching files.
+    """
+    annotation_dir = Path(annotation_dir)
+
+    # Collect all entry names present under each annotation subdirectory.
+    # Species prefixes may contain dots (e.g. "CBS_148.51"), so we cannot
+    # split on the first dot; instead we test startswith per expected prefix.
+    annotation_names: list[str] = []
+    for subdir in annotation_dir.iterdir():
+        if not subdir.is_dir():
+            continue
+        for entry in subdir.iterdir():
+            annotation_names.append(entry.name)
+
+    df = pd.read_csv(taxonomy_path, dtype=str)
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    results: dict[str, bool] = {}
+    for _, row in df.iterrows():
+        species = str(row["species"]).strip()
+        strain = str(row["strain"]).strip()
+        expected = re.sub(r"\s+", "_", species) + "_" + re.sub(r"\s+", "_", strain)
+        # File names equal the prefix exactly (bare directories) or start with
+        # the prefix followed by '.' (e.g. "Genus_species_STRAIN.ext").
+        found = any(
+            n == expected or n.startswith(expected + ".")
+            for n in annotation_names
+        )
+        results[expected] = found
+        if not found:
+            logger.warning(
+                "No annotation files found for expected prefix '%s' "
+                "(SPECIES: '%s', STRAIN: '%s')",
+                expected,
+                species,
+                strain,
+            )
+
+    missing = [p for p, ok in results.items() if not ok]
+    if missing:
+        logger.warning(
+            "%d/%d species prefix(es) have no annotation files: %s",
+            len(missing),
+            len(results),
+            missing,
+        )
+    else:
+        logger.info(
+            "All %d species prefixes matched annotation files in %s",
+            len(results),
+            annotation_dir,
+        )
+
+    return results
 
 
 # ── feature matrices ──────────────────────────────────────────────────────────
@@ -111,17 +214,23 @@ def discover_annotation_files(
     genome_ids: list[str] | None = None,
 ) -> dict[str, Path]:
     """
-    Discover annotation files matching a suffix pattern.
+    Discover annotation files matching a suffix pattern, including .gz variants.
 
-    Returns dict: genome_id -> Path.
+    Returns dict: genome_id -> Path. Uncompressed files take priority over .gz.
     """
     annotation_dir = Path(annotation_dir)
     paths: dict[str, Path] = {}
-    for path in sorted(annotation_dir.rglob(f"*{suffix}")):
-        genome_id = path.stem.replace(suffix.lstrip("."), "").rstrip(".")
-        if genome_ids is None or genome_id in genome_ids:
-            paths[genome_id] = path
-    logger.info(f"Discovered {len(paths)} annotation files (*{suffix}) in {annotation_dir}")
+    bare_suffix = suffix.lstrip(".")  # e.g. ".tmhmm_short.tsv" → "tmhmm_short.tsv"
+    for pattern in (f"*{suffix}", f"*{suffix}.gz"):
+        for path in sorted(annotation_dir.rglob(pattern)):
+            name = path.name[:-3] if path.name.endswith(".gz") else path.name
+            if name.endswith(bare_suffix):
+                genome_id = name[:-len(bare_suffix)].rstrip("._")
+            else:
+                continue
+            if genome_ids is None or genome_id in genome_ids:
+                paths.setdefault(genome_id, path)
+    logger.info(f"Discovered {len(paths)} annotation files (*{suffix}[.gz]) in {annotation_dir}")
     return paths
 
 

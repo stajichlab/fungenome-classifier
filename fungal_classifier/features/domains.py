@@ -9,6 +9,7 @@ Produces a genome × domain matrix of copy numbers or binary presence/absence.
 
 from __future__ import annotations
 
+import gzip
 import logging
 from pathlib import Path
 from typing import Literal
@@ -29,7 +30,8 @@ def parse_domtblout(path: Path, e_value_threshold: float = 1e-5) -> pd.DataFrame
     Columns: protein_id, domain_acc, domain_name, e_value, score.
     """
     records = []
-    with open(path) as fh:
+    opener = gzip.open if Path(path).suffix == ".gz" else open
+    with opener(path, "rt") as fh:
         for line in fh:
             if line.startswith("#") or not line.strip():
                 continue

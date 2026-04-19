@@ -18,6 +18,7 @@ JASPAR fungal PWM download:
 
 from __future__ import annotations
 
+import gzip
 import logging
 import subprocess
 import tempfile
@@ -288,7 +289,9 @@ def compute_motif_features_for_genome(
         )
 
     # Count promoters
-    n_promoters = sum(1 for line in open(promoter_fasta) if line.startswith(">"))
+    opener = gzip.open if Path(promoter_fasta).suffix == ".gz" else open
+    with opener(promoter_fasta, "rt") as _fh:
+        n_promoters = sum(1 for line in _fh if line.startswith(">"))
 
     # Run FIMO
     fimo_dir = genome_work / "fimo_out"

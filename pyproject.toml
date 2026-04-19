@@ -37,3 +37,23 @@ markers = [
     "slow: marks tests as slow (integration tests, deselect with -m 'not slow')",
 ]
 addopts = "-v --tb=short"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+fungal-classifier = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+python = ">=3.14.4,<3.15"
+numpy = ">=2.4.3,<3"
+pytest = ">=9.0.3,<10"
+yaml = ">=0.2.5,<0.3"
+pyyaml = ">=6.0.3,<7"

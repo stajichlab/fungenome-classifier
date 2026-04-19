@@ -7,8 +7,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+**New feature blocks**
+- `features/subcellular.py` — protein subcellular localisation and membrane topology features combining four predictors:
+  - TMHMM2 short format: transmembrane helix count histogram, fraction of TM proteins, mean ExpAA
+  - SignalP-6: fraction of proteins with signal peptide, mean SP probability
+  - WolfPSORT: fraction and mean kNN score per predicted compartment (nucl, mito, cyto, extr, plas, E.R., golg, vacu, cysk, pero, cyto\_nucl, cyto\_pero)
+  - TargetP-2: fraction noTP/SP/mTP, mean SP and mTP probabilities
+  - `build_subcellular_matrix()` concatenates all available sub-blocks into one matrix
+- `features/disorder.py` — intrinsic protein disorder features from AIUPred output:
+  - Per-genome mean and median residue disorder score
+  - Fraction of disordered residues (threshold 0.5)
+  - Fraction of proteins containing any IDR / a long IDR (≥10 consecutive disordered residues)
+  - Mean per-protein disorder score
+- `features/proteases.py` — protease repertoire features from MEROPS BLAST tabular results:
+  - Family-level copy numbers (S01, A01, C19, …)
+  - Clan-level copy numbers (SA, CA, MA, …)
+  - Total protease fraction of proteome
+  - Filters by identity, alignment length, and e-value; rare families dropped by `min_genome_freq`
+- `features/composition.py` — codon usage, amino acid frequency, and gene count features:
+  - 61 sense-codon relative frequencies
+  - 20 amino acid relative frequencies (derived from codons or directly from protein FASTA)
+  - GC content at each codon position (GC1, GC2, GC3) and overall coding GC
+  - Gene count (number of CDS/protein records)
+  - Accepts pre-computed `.codon_freq.csv` files (fast) or computes directly from CDS/protein FASTA
+
+**New utility**
+- `utils/io.py`: `load_taxonomy()` — loads `annotations/taxonomy/samples.csv` (ASMID, SPECIESIN, STRAIN, BIOPROJECT, NCBI\_TAXONID, BUSCO\_LINEAGE, PHYLUM–SPECIES hierarchy, LOCUSTAG); indexed by assembly ID with standardised lower-case columns
+
+**Compressed input support (.gz)**
+- All annotation parsers now transparently read gzip-compressed files:
+  - `features/domains.py` `parse_domtblout()` — `.domtblout.gz`
+  - `features/pathways.py` `parse_antismash_json()` — `.json.gz`
+  - `features/repeats.py` `parse_rmout()`, `get_genome_size_from_fai()` — `.out.gz`, `.fai.gz`
+  - `features/motifs.py` promoter FASTA counter — `.fasta.gz`
+  - `features/kmer.py` `_load_sequences()` — genome FASTA `.gz` via BioPython file handle
+  - `features/composition.py` — all FASTA and CSV inputs
+  - `features/subcellular.py`, `features/disorder.py`, `features/proteases.py` — all inputs
+- `utils/io.py`: added `open_text(path)` helper that returns a `gzip.open` or plain `open` handle based on the `.gz` suffix
+- `utils/io.py`: `discover_annotation_files()` now searches both `*{suffix}` and `*{suffix}.gz` patterns; genome ID extraction updated to correctly strip compound suffixes (e.g. `.tmhmm_short.tsv`, `.signalp.results.txt`, `_summary.targetp2`)
+
+**Script and configuration updates**
+- `scripts/01_build_features.py`:
+  - New `--taxonomy` argument to load and export `samples.csv` alongside feature matrices
+  - New blocks: `subcellular`, `disorder`, `proteases`, `composition` (all included in default block list)
+  - Annotation subdirectories: `tmhmm/`, `signalp/`, `wolfpsort/`, `targetp/`, `aiupred/`, `merops/`, `cds/`
+- `configs/default.yaml`: added `subcellular`, `disorder`, `proteases`, and `composition` sections with tunable thresholds and filters
+
 ### Planned
-- Secretome feature block (SignalP + GPI anchor composition)
 - Multi-label classification for genomes spanning multiple niches
 - Active learning module for sequencing prioritisation
 - NCBI datasets API integration for automated annotation download

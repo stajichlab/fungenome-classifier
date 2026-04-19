@@ -17,6 +17,7 @@ Normalization options:
 
 from __future__ import annotations
 
+import gzip
 import itertools
 import logging
 from pathlib import Path
@@ -81,8 +82,11 @@ def _load_sequences(
     For 'both', concatenates genomic and CDS sequences with an N separator.
     """
     sequences = []
-    for record in SeqIO.parse(str(fasta_path), "fasta"):
-        sequences.append(str(record.seq))
+    fasta_path = Path(fasta_path)
+    opener = gzip.open if fasta_path.suffix == ".gz" else open
+    with opener(fasta_path, "rt") as fh:
+        for record in SeqIO.parse(fh, "fasta"):
+            sequences.append(str(record.seq))
     return "N".join(sequences)
 
 

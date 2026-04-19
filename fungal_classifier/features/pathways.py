@@ -12,6 +12,7 @@ Handles:
 
 from __future__ import annotations
 
+import gzip
 import json
 import logging
 import re
@@ -133,7 +134,8 @@ def parse_antismash_json(path: Path) -> pd.Series:
     Returns Series: bgc_type -> count of clusters.
     """
     try:
-        with open(path) as fh:
+        opener = gzip.open if Path(path).suffix == ".gz" else open
+        with opener(path, "rt") as fh:
             data = json.load(fh)
         bgc_counts: dict[str, int] = {}
         for record in data.get("records", []):
