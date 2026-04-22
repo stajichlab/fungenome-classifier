@@ -19,6 +19,9 @@ Dev extras: `pip install -e ".[dev]"` adds pytest, ruff, pre-commit.
 ## Commands
 
 ```bash
+# Metadata (run once before features)
+make metadata                       # scripts/00_build_metadata.py → data/raw/metadata.tsv
+
 # Tests
 make test-fast                      # unit tests only (excludes @pytest.mark.slow)
 make test                           # full suite including integration tests
@@ -28,7 +31,8 @@ pytest tests/test_features.py -v   # single file
 make lint                           # ruff check + ruff format --check
 make format                         # apply ruff fixes
 
-# Pipeline
+# Pipeline (run in order)
+make metadata                       # 00_build_metadata.py — rebuild metadata.tsv
 make features                       # 01_build_features.py (all blocks)
 make train                          # 02_train.py → taxonomy_order, clade-holdout CV
 make train-all                      # train + train-ecology + train-lifestyle
