@@ -244,7 +244,7 @@ def build_composition_matrix_from_fasta(
             logger.warning(f"Failed composition (FASTA) for {genome_id}: {e}")
             return genome_id, pd.Series(dtype=np.float32)
 
-    results = Parallel(n_jobs=n_jobs)(
+    results = Parallel(n_jobs=n_jobs, batch_size=1)(
         delayed(_process)(gid, path, kind)
         for gid, (path, kind) in tqdm(all_paths.items(), desc="Composition (FASTA)")
     )

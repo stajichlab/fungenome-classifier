@@ -458,7 +458,7 @@ def build_motif_matrix_from_genomes(
             return genome_id, pd.Series(dtype=np.float32)
 
     genome_ids = sorted(set(genome_fastas) & set(gff_paths))
-    results = Parallel(n_jobs=n_jobs)(
+    results = Parallel(n_jobs=n_jobs, batch_size=1)(
         delayed(_process)(gid) for gid in tqdm(genome_ids, desc="Motif pipeline")
     )
 

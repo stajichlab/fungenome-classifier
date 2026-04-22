@@ -13,7 +13,10 @@ FEAT_DIR    := data/features
 RESULTS     := results
 N_JOBS      := 8
 
-.PHONY: help env metadata features train train-deep evaluate predict test lint clean
+GENOME_FASTAS  := $(wildcard $(GENOME_DIR)/*.fna) $(wildcard $(GENOME_DIR)/*.fna.gz)
+GENOME_INDEXES := $(addsuffix .fai, $(GENOME_FASTAS))
+
+.PHONY: help env metadata faidx features train train-deep evaluate predict test lint clean
 
 # ── help ───────────────────────────────────────────────────────────────────────
 help:
@@ -52,8 +55,18 @@ $(METADATA): $(SAMPLES) $(FUNGUILD)
 		--genome-dir  $(GENOME_DIR) \
 		--output      $(METADATA)
 
+# ── FASTA index ────────────────────────────────────────────────────────────────
+# Build .fai for every genome FASTA (skipped automatically when already up to date)
+$(GENOME_DIR)/%.fna.fai: $(GENOME_DIR)/%.fna
+	samtools faidx $<
+
+$(GENOME_DIR)/%.fna.gz.fai: $(GENOME_DIR)/%.fna.gz
+	samtools faidx $<
+
+faidx: $(GENOME_INDEXES)
+
 # ── feature building ───────────────────────────────────────────────────────────
-features: $(METADATA)
+features: $(METADATA) faidx
 	$(PYTHON) scripts/01_build_features.py \
 		--genome-dir $(GENOME_DIR) \
 		--annotation-dir $(ANNOT_DIR) \

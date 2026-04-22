@@ -128,7 +128,7 @@ def build_genomic_matrix(
         for gid, path in genome_fasta_paths.items()
     ]
 
-    results = Parallel(n_jobs=n_jobs)(
+    results = Parallel(n_jobs=n_jobs, batch_size=1)(
         delayed(_process)(gid, gpath, ppath)
         for gid, gpath, ppath in tqdm(tasks, desc="Genomic size features")
     )

@@ -410,7 +410,7 @@ def build_intron_matrix(
             logger.warning(f"Failed intron features for {genome_id}: {e}")
             return genome_id, pd.Series(dtype=np.float32)
 
-    results = Parallel(n_jobs=n_jobs)(
+    results = Parallel(n_jobs=n_jobs, batch_size=1)(
         delayed(_process)(gid) for gid in tqdm(sorted(gff_paths), desc="Intron features")
     )
 

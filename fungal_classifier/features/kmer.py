@@ -177,7 +177,7 @@ def build_kmer_matrix(
             logger.warning(f"Failed to process {genome_id}: {e}")
             return genome_id, pd.Series(dtype=np.float32)
 
-    results = Parallel(n_jobs=n_jobs)(
+    results = Parallel(n_jobs=n_jobs, batch_size=1)(
         delayed(_process)(gid, path)
         for gid, path in tqdm(fasta_paths.items(), desc="K-mer features")
     )
