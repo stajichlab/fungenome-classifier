@@ -13,7 +13,7 @@ FEAT_DIR    := data/features
 RESULTS     := results
 N_JOBS      := 8
 
-.PHONY: help env features train train-deep evaluate predict test lint clean
+.PHONY: help env metadata features train train-deep evaluate predict test lint clean
 
 # ── help ───────────────────────────────────────────────────────────────────────
 help:
@@ -21,6 +21,7 @@ help:
 	@echo "FungalClassifier — pipeline targets"
 	@echo "──────────────────────────────────────────────────────"
 	@echo "  make env            Create conda environment"
+	@echo "  make metadata       Build data/raw/metadata.tsv from taxonomy + FunGuild"
 	@echo "  make features       Build all feature matrices"
 	@echo "  make train          Train XGBoost + stacking (taxonomy_order)"
 	@echo "  make train-deep     Train deep fusion model"
@@ -38,8 +39,21 @@ env:
 	conda env create -f environment.yml
 	@echo "Activate with: conda activate fungal-classifier"
 
+SAMPLES     := $(ANNOT_DIR)/taxonomy/samples.csv
+FUNGUILD    := $(ANNOT_DIR)/funguild/species_funguild.csv
+
+# ── metadata ───────────────────────────────────────────────────────────────────
+metadata: $(METADATA)
+
+$(METADATA): $(SAMPLES) $(FUNGUILD)
+	$(PYTHON) scripts/00_build_metadata.py \
+		--samples     $(SAMPLES) \
+		--funguild    $(FUNGUILD) \
+		--genome-dir  $(GENOME_DIR) \
+		--output      $(METADATA)
+
 # ── feature building ───────────────────────────────────────────────────────────
-features:
+features: $(METADATA)
 	$(PYTHON) scripts/01_build_features.py \
 		--genome-dir $(GENOME_DIR) \
 		--annotation-dir $(ANNOT_DIR) \
