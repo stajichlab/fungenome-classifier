@@ -217,7 +217,7 @@ def run_fimo(
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    fimo_tsv = output_dir / "fimo.tsv"
+    fimo_tsv_gz = output_dir / "fimo.tsv.gz"
 
     cmd = [
         "fimo",
@@ -237,14 +237,15 @@ def run_fimo(
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"FIMO failed: {result.stderr}")
-        # --text writes TSV to stdout rather than to a file
-        fimo_tsv.write_text(result.stdout)
+        # --text writes TSV to stdout; compress directly to .gz
+        with gzip.open(fimo_tsv_gz, "wt") as fh:
+            fh.write(result.stdout)
     except FileNotFoundError:
         raise EnvironmentError(
             "fimo not found in PATH. Install MEME Suite: https://meme-suite.org/meme/doc/install.html"
         )
 
-    return fimo_tsv
+    return fimo_tsv_gz
 
 
 # ── FIMO output parsing ───────────────────────────────────────────────────────
@@ -270,14 +271,15 @@ def parse_fimo_tsv(path: Path, p_value_threshold: float = 1e-4) -> pd.DataFrame:
         "sequence name": "sequence_name",
         "matched sequence": "matched_sequence",
     }
+    opener = gzip.open if str(path).endswith(".gz") else open
     try:
-        with open(path) as fh:
+        with opener(path, "rt") as fh:
             header_line = next((line for line in fh if line.strip()), "")
         is_old_format = header_line.startswith("#pattern name")
 
         if is_old_format:
             # First line is the header prefixed with '#'; strip it, then read the rest
-            with open(path) as fh:
+            with opener(path, "rt") as fh:
                 raw_header = fh.readline().lstrip("#").rstrip("\n").split("\t")
                 df = pd.read_csv(fh, sep="\t", names=raw_header)
             df = df.rename(columns=_OLD_COL_MAP)
@@ -406,12 +408,14 @@ def compute_motif_features_for_genome(
     with opener(promoter_fasta, "rt") as _fh:
         n_promoters = sum(1 for line in _fh if line.startswith(">"))
 
-    # Run FIMO
+    # Run FIMO (skip if cached .gz already exists)
     fimo_dir = genome_work / "fimo_out"
-    fimo_tsv = run_fimo(pwm_database, promoter_fasta, fimo_dir, p_value_threshold)
+    fimo_tsv_gz = fimo_dir / "fimo.tsv.gz"
+    if not fimo_tsv_gz.exists():
+        fimo_tsv_gz = run_fimo(pwm_database, promoter_fasta, fimo_dir, p_value_threshold)
 
     # Parse and aggregate
-    fimo_df = parse_fimo_tsv(fimo_tsv, p_value_threshold)
+    fimo_df = parse_fimo_tsv(fimo_tsv_gz, p_value_threshold)
     return fimo_hits_to_enrichment(fimo_df, n_promoters, representation="count")
 
 
