@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gzip
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -228,23 +229,35 @@ def discover_annotation_files(
     """
     Discover annotation files matching a suffix pattern, including .gz variants.
 
+    Follows symlinks so that per-genome subdirectories that are symlinks to
+    external locations are traversed correctly.
+
     Returns dict: genome_id -> Path. Uncompressed files take priority over .gz.
     """
     annotation_dir = Path(annotation_dir)
     paths: dict[str, Path] = {}
     bare_suffix = suffix.lstrip(".")  # e.g. ".tmhmm_short.tsv" → "tmhmm_short.tsv"
-    for pattern in (f"*{suffix}", f"*{suffix}.gz"):
-        for path in sorted(annotation_dir.rglob(pattern)):
-            name = path.name[:-3] if path.name.endswith(".gz") else path.name
-            if name.endswith(bare_suffix):
-                stem = name[: -len(bare_suffix)].rstrip("._")
-                # Fall back to parent directory name when file is inside a per-genome subdir
-                # (e.g. dbcan/{genome_id}/overview.txt)
-                genome_id = stem if stem else path.parent.name
-            else:
+
+    # os.walk with followlinks=True handles symlinked subdirectories;
+    # pathlib.rglob does not follow symlinks on Python < 3.13.
+    # Sorting filenames ensures uncompressed ("overview.tsv") sorts before
+    # the gz variant ("overview.tsv.gz"), so setdefault keeps uncompressed.
+    for dirpath, _dirnames, filenames in os.walk(annotation_dir, followlinks=True):
+        parent = Path(dirpath)
+        for filename in sorted(filenames):
+            is_gz = filename.endswith(".gz")
+            name = filename[:-3] if is_gz else filename
+            if not (filename.endswith(suffix) or filename.endswith(suffix + ".gz")):
                 continue
+            if not name.endswith(bare_suffix):
+                continue
+            stem = name[: -len(bare_suffix)].rstrip("._")
+            # Fall back to parent directory name for per-genome subdir layout
+            # e.g. dbcan/{genome_id}/overview.tsv.gz → genome_id from parent
+            genome_id = stem if stem else parent.name
             if genome_ids is None or genome_id in genome_ids:
-                paths.setdefault(genome_id, path)
+                paths.setdefault(genome_id, parent / filename)
+
     logger.info(f"Discovered {len(paths)} annotation files (*{suffix}[.gz]) in {annotation_dir}")
     return paths
 

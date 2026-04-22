@@ -56,22 +56,52 @@ def _build_genome_sizes(fai_path: Path) -> Path:
     return Path(tmp.name)
 
 
-def _filter_gff_by_feature(gff_path: Path, feature_type: str) -> Path:
+def _gff_attr(attributes: str, key: str) -> str | None:
+    """Extract a single attribute value from a GFF3 attributes string."""
+    for token in attributes.split(";"):
+        token = token.strip()
+        if token.startswith(key + "="):
+            return token[len(key) + 1 :]
+    return None
+
+
+def _gene_name_from_attrs(attributes: str) -> str:
     """
-    Write a temp GFF containing only rows whose type column matches feature_type.
+    Return the best gene name from a GFF3 attributes string.
+
+    Priority: Name= > ID= (stripping a leading 'gene:' prefix).
+    """
+    name = _gff_attr(attributes, "Name")
+    if name:
+        return name
+    gene_id = _gff_attr(attributes, "ID")
+    if gene_id:
+        return gene_id.removeprefix("gene:")
+    return ""
+
+
+def _filter_gff_to_bed(gff_path: Path, feature_type: str) -> Path:
+    """
+    Filter a GFF3 to feature_type rows and write BED6 with the gene name in
+    column 4, so bedtools getfasta -name uses the actual gene ID as the header.
 
     Handles plain and .gz input. Returns path to temp file (caller must unlink).
     """
     opener = gzip.open if str(gff_path).endswith(".gz") else open
-    tmp = tempfile.NamedTemporaryFile(suffix=".gff", delete=False, mode="w")
+    tmp = tempfile.NamedTemporaryFile(suffix=".bed", delete=False, mode="w")
     with opener(gff_path, "rt") as fh:
         for line in fh:
             if line.startswith("#"):
-                tmp.write(line)
                 continue
-            parts = line.split("\t")
-            if len(parts) >= 3 and parts[2] == feature_type:
-                tmp.write(line)
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) < 9 or parts[2] != feature_type:
+                continue
+            chrom = parts[0]
+            start = str(int(parts[3]) - 1)  # GFF is 1-based, BED is 0-based
+            end = parts[4]
+            strand = parts[6]
+            name = _gene_name_from_attrs(parts[8]) or f"{chrom}:{start}-{end}"
+            tmp.write(f"{chrom}\t{start}\t{end}\t{name}\t.\t{strand}\n")
     tmp.close()
     return Path(tmp.name)
 
@@ -106,7 +136,7 @@ def extract_upstream_sequences(
         tmp.close()
 
     sizes_path = _build_genome_sizes(Path(f"{genome_fasta}.fai"))
-    gff_filtered = _filter_gff_by_feature(gff_path, feature_type)
+    gff_filtered = _filter_gff_to_bed(gff_path, feature_type)
 
     cmd_flank = [
         "bedtools",
@@ -156,7 +186,7 @@ def extract_upstream_sequences(
         )
     finally:
         sizes_path.unlink(missing_ok=True)
-        gff_filtered.unlink(missing_ok=True)
+        gff_filtered.unlink(missing_ok=True)  # temp BED file
 
     return output_fasta
 
@@ -224,22 +254,39 @@ def parse_fimo_tsv(path: Path, p_value_threshold: float = 1e-4) -> pd.DataFrame:
     """
     Parse FIMO TSV output file.
 
-    FIMO TSV columns:
-        motif_id, motif_alt_id, sequence_name, start, stop, strand,
-        score, p-value, q-value, matched_sequence
+    Handles two formats:
+    - MEME Suite 5+:  header row ``motif_id  motif_alt_id  sequence_name ...``
+    - Older FIMO:     header row ``#pattern name  sequence name ...``
+      (header starts with ``#``, columns use spaces in names)
 
-    Returns tidy DataFrame of significant hits.
+    Returns tidy DataFrame with canonical columns ``motif_id`` and
+    ``sequence_name`` present, filtered to p-value <= p_value_threshold.
     """
+    # Old FIMO format (pre-5): header line begins with '#pattern name'.
+    # New format: header does NOT start with '#'.
+    # Read the first non-empty line to detect which format we have.
+    _OLD_COL_MAP = {
+        "pattern name": "motif_id",
+        "sequence name": "sequence_name",
+        "matched sequence": "matched_sequence",
+    }
     try:
-        df = pd.read_csv(
-            path,
-            sep="\t",
-            comment="#",
-            dtype={"p-value": float, "score": float},
-        )
-        # Drop footer lines FIMO sometimes writes
+        with open(path) as fh:
+            header_line = next((line for line in fh if line.strip()), "")
+        is_old_format = header_line.startswith("#pattern name")
+
+        if is_old_format:
+            # First line is the header prefixed with '#'; strip it, then read the rest
+            with open(path) as fh:
+                raw_header = fh.readline().lstrip("#").rstrip("\n").split("\t")
+                df = pd.read_csv(fh, sep="\t", names=raw_header)
+            df = df.rename(columns=_OLD_COL_MAP)
+        else:
+            df = pd.read_csv(path, sep="\t", comment="#")
+
         df = df.dropna(subset=["motif_id", "sequence_name"])
-        df = df[df["p-value"].astype(float) <= p_value_threshold]
+        df["p-value"] = df["p-value"].astype(float)
+        df = df[df["p-value"] <= p_value_threshold]
         return df
     except Exception as e:
         logger.warning(f"Failed to parse FIMO output {path}: {e}")
