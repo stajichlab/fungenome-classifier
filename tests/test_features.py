@@ -30,7 +30,7 @@ def test_count_kmers_handles_n():
     """N bases should be dropped; remaining characters are all counted."""
     seq = "AANCGT"
     counts = _count_kmers(seq, k=1)
-    # "AANCGT" → replace N → "AACGT": A=2, C=1, G=1, T=1 = 5 total
+    # Windows with N are skipped; remaining: A=2, C=1, G=1, T=1 = 5 total
     assert sum(counts.values()) == 5
     assert counts["A"] == 2
 
@@ -54,7 +54,6 @@ def test_obs_exp_ratio_uniform():
     oe = _obs_exp_ratio(counts_2, counts_1)
     for kmer, val in oe.items():
         assert 0.5 < val < 2.0, f"Unexpected obs/exp {val} for {kmer}"
-
 
 def test_kmer_feature_vector_length():
     """Feature vector should have 4^k entries per k value."""

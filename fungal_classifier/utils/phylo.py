@@ -7,6 +7,7 @@ Phylogenetic utility functions:
   - Taxonomic lineage parsing
   - Tree-to-distance matrix conversion caching
 """
+__all__ = ["prune_tree_to_genomes", "get_tree_tip_names", "cache_distance_matrix", "parse_taxonomy_string", "expand_taxonomy_column", "get_clade_members"]
 
 from __future__ import annotations
 
@@ -26,50 +27,52 @@ def prune_tree_to_genomes(tree, genome_ids: list[str]):
     Returns pruned tree of the same type.
     """
     try:
-        from ete3 import Tree
-
-        if isinstance(tree, Tree):
-            tree = tree.copy()
-            tip_names = {leaf.name for leaf in tree.iter_leaves()}
-            to_keep = set(genome_ids) & tip_names
-            to_prune = tip_names - to_keep
-            if to_prune:
-                tree.prune(list(to_keep), preserve_branch_length=True)
-            logger.info(f"Pruned tree: {len(to_keep)} tips retained, {len(to_prune)} removed")
-            return tree
+        from ete3 import Tree as Ete3Tree
     except ImportError:
-        pass
+        Ete3Tree = None
 
     try:
         import dendropy
-
-        if isinstance(tree, dendropy.Tree):
-            taxa_to_keep = {t for t in tree.taxon_namespace if t.label in set(genome_ids)}
-            tree.retain_taxa(taxa_to_keep)
-            return tree
     except ImportError:
-        pass
+        dendropy = None
 
-    raise TypeError(f"Unrecognized tree type: {type(tree)}")
+    if Ete3Tree is not None and isinstance(tree, Ete3Tree):
+        tree = tree.copy()
+        tip_names = {l.name for l in tree.iter_leaves()}
+        to_keep = set(genome_ids) & tip_names
+        to_prune = tip_names - to_keep
+        if to_prune:
+            tree.prune(list(to_keep), preserve_branch_length=True)
+        logger.info(f"Pruned tree: {len(to_keep)} tips retained, {len(to_prune)} removed")
+        return tree
+
+    if dendropy is not None and isinstance(tree, dendropy.Tree):
+        taxa_to_keep = {t for t in tree.taxon_namespace if t.label in set(genome_ids)}
+        tree.retain_taxa(taxa_to_keep)
+        return tree
+
+    raise TypeError(f"Unrecognized tree type: {type(tree)}. ete3 or dendropy required.")
 
 
 def get_tree_tip_names(tree) -> list[str]:
     """Return list of tip names from ete3 or dendropy tree."""
     try:
-        from ete3 import Tree
-
-        if isinstance(tree, Tree):
-            return [leaf.name for leaf in tree.iter_leaves()]
+        from ete3 import Tree as Ete3Tree
     except ImportError:
-        pass
+        Ete3Tree = None
+
     try:
         import dendropy
-
-        if isinstance(tree, dendropy.Tree):
-            return [t.label for t in tree.taxon_namespace]
     except ImportError:
-        pass
-    raise TypeError(f"Unrecognized tree type: {type(tree)}")
+        dendropy = None
+
+    if Ete3Tree is not None and isinstance(tree, Ete3Tree):
+        return [l.name for l in tree.iter_leaves()]
+
+    if dendropy is not None and isinstance(tree, dendropy.Tree):
+        return [t.label for t in tree.taxon_namespace]
+
+    raise TypeError(f"Unrecognized tree type: {type(tree)}. ete3 or dendropy required.")
 
 
 def cache_distance_matrix(

@@ -9,6 +9,7 @@ Handles:
   - CAZyme family profiles (from dbCAN output)
   - Biosynthetic gene cluster (BGC) counts (from antiSMASH output)
 """
+__all__ = ["parse_kegg_annotation", "build_kegg_matrix", "parse_dbcan_output", "build_cazyme_matrix", "parse_antismash_json", "build_bgc_matrix", "aggregate_go_terms", "build_go_matrix"]
 
 from __future__ import annotations
 

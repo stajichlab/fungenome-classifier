@@ -15,6 +15,8 @@ Normalization options:
                          (only defined for k >= 2; uses lower-order frequencies)
 """
 
+__all__ = ["compute_kmer_features", "build_kmer_matrix"]
+
 from __future__ import annotations
 
 import gzip
@@ -42,34 +44,72 @@ def _all_kmers(k: int) -> list[str]:
 
 
 def _count_kmers(seq: str, k: int) -> dict[str, int]:
-    """Slide a window of length k over seq and count occurrences."""
-    seq = seq.upper().replace("N", "")  # drop ambiguous bases
+    """Slide a window of length k over seq and count occurrences.
+
+    Skips any window that contains an N (ambiguous base) so that
+    normalisation over the counted windows is correct.
+    """
+    seq = seq.upper()
     counts: dict[str, int] = {kmer: 0 for kmer in _all_kmers(k)}
+    n_valid = 0
     for i in range(len(seq) - k + 1):
         kmer = seq[i : i + k]
+        if "N" in kmer:
+            continue
+        n_valid += 1
         if kmer in counts:
             counts[kmer] += 1
     return counts
 
 
-def _obs_exp_ratio(counts_k: dict[str, int], counts_k1: dict[str, int]) -> dict[str, float]:
+def _obs_exp_ratio(
+    counts_k: dict[str, int],
+    counts_k1: dict[str, int],
+    counts_k2: dict[str, int] | None = None,
+) -> dict[str, float]:
     """
     Compute observed/expected ratio for each k-mer.
 
-    Expected frequency of XY...Z = f(XY...)/f(Y...Z) * f(Y...) corrected form.
-    For k=2: obs_exp(XY) = f(XY) / (f(X) * f(Y)) * genome_length
-    For k>2: obs_exp(XY...Z) = f(XY...Z) / (f(XY...) * f(Y...Z) / f(Y...))
+    Uses a first-order Markov model: the expected frequency of a k-mer
+    XY...Z is f(XY...) * f(Y...Z) / f(Y...), where f(XY...) and f(Y...Z)
+    are the (k-1)-mer frequencies and f(Y...) is the (k-2)-mer frequency.
+
+    obs/exp(XY...Z) = f(XY...Z) / expected
+
+    For k=2 (dinucleotides) this simplifies to f(XY) / (f(X) * f(Y)).
+    For k=3 it uses f(ABC) / (f(AB) * f(BC) / f(B)) — requires counts_k2.
+    For k>3 it requires both counts_k1 and counts_k2.
+
+    When counts_k2 is not provided (k<=3), the centre term is skipped and
+    the simple f(prefix) * f(suffix) product is used.
     """
     total_k = sum(counts_k.values()) or 1
     total_k1 = sum(counts_k1.values()) or 1
     freq_k = {kmer: c / total_k for kmer, c in counts_k.items()}
     freq_k1 = {kmer: c / total_k1 for kmer, c in counts_k1.items()}
+    freq_k2: dict[str, float] = {}
+    if counts_k2 is not None:
+        total_k2 = sum(counts_k2.values()) or 1
+        freq_k2 = {kmer: c / total_k2 for kmer, c in counts_k2.items()}
 
     result: dict[str, float] = {}
     for kmer, obs in freq_k.items():
-        prefix = kmer[:-1]
-        suffix = kmer[1:]
-        denom = freq_k1.get(prefix, 0) * freq_k1.get(suffix, 0)
+        prefix = kmer[:-1]     # (k-1)-mer XY...
+        suffix = kmer[1:]      # (k-1)-mer ...YZ
+        center = kmer[1:-1]    # (k-2)-mer ...Y (empty for k=2)
+        has_center = len(center) > 0
+
+        if has_center and freq_k2:
+            # k >= 3 with (k-2)-mer counts: expected = f(prefix)*f(suffix)/f(center)
+            denom = freq_k1.get(prefix, 0) * freq_k1.get(suffix, 0) / max(
+                freq_k2.get(center, 0), 1e-12
+            )
+        elif has_center:
+            # k = 3 without (k-2)-mer counts: approximate with no centre correction
+            denom = freq_k1.get(prefix, 0) * freq_k1.get(suffix, 0)
+        else:
+            # k = 2: expected = f(prefix) * f(suffix)  (no centre term)
+            denom = freq_k1.get(prefix, 0) * freq_k1.get(suffix, 0)
         result[kmer] = obs / denom if denom > 0 else 0.0
     return result
 
@@ -138,7 +178,8 @@ def compute_kmer_features(
                     features[f"kmer_{k}_{kmer}"] = c / total
             else:
                 counts_k1 = counts_cache[k - 1]
-                oe = _obs_exp_ratio(counts_k, counts_k1)
+                counts_k2 = counts_cache.get(k - 2)
+                oe = _obs_exp_ratio(counts_k, counts_k1, counts_k2)
                 for kmer, val in oe.items():
                     features[f"kmer_{k}_{kmer}"] = val
 

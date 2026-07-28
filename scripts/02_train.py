@@ -165,6 +165,10 @@ def main():
         X_fused = fusion_pipeline.fit_transform(feature_blocks, y)
         logger.info(f"Fused feature matrix: {X_fused.shape}")
 
+    # ── Model output directory (needed early for deep model path) ───────────
+    models_dir = args.output_dir / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+
     # ── Train block classifiers ───────────────────────────────────────────────
     block_model_kwargs = {
         "model_type": args.model_type if args.model_type != "deep" else "xgboost",

@@ -9,6 +9,7 @@ Two embedding sources:
 
 Both can be exported to TSV for downstream analysis (e.g. in R, iTOL tree annotation).
 """
+__all__ = ["compute_pca_embedding", "compute_umap_embedding", "compute_tsne_embedding", "extract_tower_embeddings", "compute_fused_embedding", "plot_embedding", "plot_embedding_grid", "run_embedding_export"]
 
 from __future__ import annotations
 

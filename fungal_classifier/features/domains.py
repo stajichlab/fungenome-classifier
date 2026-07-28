@@ -6,6 +6,7 @@ Protein domain feature extraction from Pfam/InterPro annotations.
 Expects hmmer domtblout format (from pfam_scan.pl or hmmscan).
 Produces a genome × domain matrix of copy numbers or binary presence/absence.
 """
+__all__ = ["parse_domtblout", "parse_interpro_tsv", "build_domain_matrix"]
 
 from __future__ import annotations
 
@@ -28,20 +29,41 @@ def parse_domtblout(path: Path, e_value_threshold: float = 1e-5) -> pd.DataFrame
     """
     Parse hmmer --domtblout file into a tidy DataFrame.
 
-    Columns: protein_id, domain_acc, domain_name, e_value, score.
+    HMMER domtblout columns (whitespace-delimited, 0-indexed):
+      0  : target name        (protein/gene ID)
+      1  : target accession   (protein accession, may be '-')
+      2  : target description
+      3  : query name         (HMM/Pfam family name)
+      4  : query accession    (Pfam accession, e.g. PF00001)
+      5  : qlen
+      6  : full E-value
+      7  : full score
+      8  : full bias
+      9  : domain E-value     (conditional E-value for this domain)
+      10 : domain score
+      11 : domain bias
+      ...
+
+    We use: protein_id=parts[0], domain_name=parts[3],
+            domain_acc=parts[4], e_value=parts[6], score=parts[7].
+
+    The Pfam accession (parts[4]) may include a dot-version suffix
+    (e.g. PF00001.17) — this is stripped to the base family ID.
     """
     records = []
     opener = gzip.open if Path(path).suffix == ".gz" else open
     with opener(path, "rt") as fh:
         for line in fh:
-            if line.startswith("#") or not line.strip():
+            line = line.strip()
+            if line.startswith("#") or not line:
                 continue
             parts = line.split()
-            # domtblout columns: target, accession, tlen, query, accession2,
-            #                    qlen, full_evalue, full_score, ...
             try:
                 protein_id = parts[0]
-                domain_acc = parts[4].split(".")[0]  # strip version e.g. PF00001.1 -> PF00001
+                # Query accession (Pfam ID) — may be '-' if not in Pfam
+                raw_acc = parts[4]
+                # Strip version suffix (e.g. PF00001.17 -> PF00001); fall back to domain name if absent
+                domain_acc = raw_acc.split(".")[0] if raw_acc != "-" else parts[3]
                 domain_name = parts[3]
                 e_value = float(parts[6])
                 score = float(parts[7])
@@ -161,6 +183,12 @@ def build_domain_matrix(
     freq = (matrix > 0).mean(axis=0)
     keep = freq[freq >= min_genome_freq].index
     matrix = matrix[keep]
+
+    if matrix.shape[1] == 0:
+        logger.warning(
+            f"min_genome_freq={min_genome_freq} is too high — all domains filtered out. "
+            f"Consider lowering min_genome_freq (default: 0.01)."
+        )
 
     logger.info(
         f"Domain matrix: {matrix.shape[0]} genomes × {matrix.shape[1]} domains "

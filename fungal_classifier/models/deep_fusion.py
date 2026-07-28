@@ -13,6 +13,7 @@ Supports:
   - Auxiliary per-block classification losses (multi-task)
   - Training with phylogenetic eigenvectors as additional input
 """
+__all__ = ["BlockTower", "BlockAttention", "DeepFusionClassifier", "DeepFusionTrainer"]
 
 from __future__ import annotations
 
@@ -64,28 +65,52 @@ class BlockTower(nn.Module):
 class BlockAttention(nn.Module):
     """
     Soft attention over block embeddings.
-    Learns a scalar attention weight per block, then produces a
-    weighted sum of block embedding vectors.
+
+    Each block receives a scalar weight (per sample) learned from the
+    concatenation of all block embeddings. The final representation is the
+    weighted sum of present-block embeddings; missing blocks contribute zero.
     """
 
     def __init__(self, n_blocks: int, embedding_dim: int):
         super().__init__()
+        self.n_blocks = n_blocks
+        self.embedding_dim = embedding_dim
+        # Attention query: packed representation of all blocks
         self.attention = nn.Linear(embedding_dim * n_blocks, n_blocks)
 
-    def forward(self, block_embeddings: list[torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self,
+        block_embeddings: dict[str, torch.Tensor],
+        all_block_names: list[str],
+    ) -> torch.Tensor:
         """
         Parameters
         ----------
-        block_embeddings : List of (batch, embedding_dim) tensors.
+        block_embeddings : Dict block_name -> (batch, embedding_dim) tensor.
+                           Only contains blocks that are present.
+        all_block_names  : Ordered list of all block names registered at init.
 
         Returns
         -------
-        (batch, embedding_dim) weighted sum.
+        (batch, embedding_dim) weighted sum of present-block embeddings.
         """
-        concat = torch.cat(block_embeddings, dim=1)  # (batch, n_blocks * emb_dim)
-        weights = F.softmax(self.attention(concat), dim=1)  # (batch, n_blocks)
-        stacked = torch.stack(block_embeddings, dim=1)  # (batch, n_blocks, emb_dim)
-        attended = (stacked * weights.unsqueeze(2)).sum(dim=1)  # (batch, emb_dim)
+        batch_size = next(iter(block_embeddings.values())).shape[0]
+        # Zero-pad all blocks to n_blocks so the attention linear layer sees
+        # a consistent input size regardless of how many blocks are present.
+        padded_embs: list[torch.Tensor] = []
+        for name in all_block_names:
+            if name in block_embeddings:
+                padded_embs.append(block_embeddings[name])
+            else:
+                padded_embs.append(torch.zeros(
+                    batch_size, self.embedding_dim,
+                    device=next(iter(block_embeddings.values())).device,
+                ))
+
+        concat = torch.cat(padded_embs, dim=1)                         # (batch, n_blocks * emb_dim)
+        weights = F.softmax(self.attention(concat), dim=1)             # (batch, n_blocks)
+        stacked = torch.stack(padded_embs, dim=1)                      # (batch, n_blocks, emb_dim)
+        attended = (stacked * weights.unsqueeze(2)).sum(dim=1)         # (batch, emb_dim)
         return attended
 
 
@@ -138,7 +163,7 @@ class DeepFusionClassifier(nn.Module):
         # Fusion layer
         n_blocks = len(block_dims)
         if fusion == "attention":
-            self.attention = BlockAttention(n_blocks, embedding_dim)
+            self.attention = BlockAttention(n_blocks=n_blocks, embedding_dim=embedding_dim)
             head_input_dim = embedding_dim
         else:  # concat
             head_input_dim = embedding_dim * n_blocks
@@ -174,16 +199,18 @@ class DeepFusionClassifier(nn.Module):
             for name in self.block_names
             if name in block_inputs
         }
-        emb_list = [embeddings[name] for name in self.block_names if name in embeddings]
 
-        # Auxiliary losses
-        aux_logits = {name: self.aux_heads[name](emb) for name, emb in embeddings.items()}
+        # Auxiliary losses (only for present blocks to avoid zero-input aux heads)
+        aux_logits = {
+            name: self.aux_heads[name](emb)
+            for name, emb in embeddings.items()
+        }
 
         # Fusion
         if self.fusion == "attention":
-            fused = self.attention(emb_list)
+            fused = self.attention(embeddings, self.block_names)
         else:
-            fused = torch.cat(emb_list, dim=1)
+            fused = torch.cat(list(embeddings.values()), dim=1)
 
         logits = self.classifier(fused)
 

@@ -9,6 +9,7 @@ Computes:
   - Simple repeat and low-complexity region density
   - Repeat landscape summaries (Kimura distance distributions)
 """
+__all__ = ["parse_rmout", "get_genome_size_from_fai", "compute_repeat_features", "build_repeat_matrix"]
 
 from __future__ import annotations
 

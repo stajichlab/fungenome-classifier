@@ -65,15 +65,13 @@ A rough guideline: the clade holdout level should be **one level above** the tar
 Before choosing a CV strategy, it's useful to know how much phylogenetic signal exists in your labels using **Blomberg's K** statistic.
 
 ```python
-from fungal_classifier.evaluation.phylo_cv import (
-    get_patristic_distances, blombergs_k
-)
+from fungal_classifier.evaluation.phylo_cv import load_tree, blombergs_k
 from sklearn.preprocessing import LabelEncoder
 
-D = get_patristic_distances(tree, genome_ids)
+tree = load_tree("data/raw/phylogeny.nwk")
 le = LabelEncoder()
 y_enc = pd.Series(le.fit_transform(y), index=y.index)
-K = blombergs_k(y_enc, D)
+K = blombergs_k(y_enc, tree)
 print(f"Blomberg's K = {K:.3f}")
 ```
 

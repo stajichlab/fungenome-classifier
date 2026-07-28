@@ -9,6 +9,7 @@ Provides:
   - CV score summaries with confidence intervals
   - Block-level performance comparison table
 """
+__all__ = ["compute_metrics", "per_class_metrics", "cv_summary", "block_comparison_table", "plot_confusion_matrix", "plot_cv_scores", "print_evaluation_report"]
 
 from __future__ import annotations
 

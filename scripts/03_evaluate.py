@@ -98,7 +98,7 @@ def main():
 
         le = LabelEncoder()
         y_enc = pd.Series(le.fit_transform(y), index=y.index)
-        K = blombergs_k(y_enc, D)
+        K = blombergs_k(y_enc, tree)
         logger.info(f"Blomberg's K for '{args.target}': {K:.4f}")
         with open(out_dir / "phylo_signal.txt", "w") as fh:
             fh.write(f"Target: {args.target}\n")

@@ -12,6 +12,7 @@ This is a standard stacking ensemble. It avoids leakage by using OOF predictions
 produced during cross-validation, not predictions from models trained on the
 full training set.
 """
+__all__ = ["StackingFusionModel"]
 
 from __future__ import annotations
 
@@ -166,9 +167,20 @@ class StackingFusionModel:
         feature_blocks: dict[str, pd.DataFrame],
         y_true: pd.Series,
     ) -> dict[str, float]:
-        """Compute accuracy and macro-F1 on a held-out set."""
+        """Compute accuracy and macro-F1 on a held-out set.
+
+        Logs a warning if any genomes are dropped due to missing blocks
+        or block-classifier misalignment.
+        """
         y_pred = self.predict(feature_blocks)
         common = y_true.index.intersection(y_pred.index)
+        n_dropped = len(y_true) - len(common)
+        if n_dropped > 0:
+            logger.warning(
+                f"evaluate: {n_dropped}/{len(y_true)} genomes dropped due to "
+                f"missing blocks or label mismatch. Metrics computed on "
+                f"{len(common)} genomes."
+            )
         acc = accuracy_score(y_true.loc[common], y_pred.loc[common])
         f1 = f1_score(
             y_true.loc[common],

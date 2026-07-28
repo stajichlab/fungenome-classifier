@@ -3,6 +3,7 @@ fungal_classifier/utils/io.py
 
 Data loading, saving, and path management utilities.
 """
+__all__ = ["load_metadata", "save_feature_matrix", "load_feature_matrix", "load_feature_blocks", "discover_genome_files", "discover_annotation_files", "save_predictions"]
 
 from __future__ import annotations
 

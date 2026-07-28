@@ -9,6 +9,7 @@ Provides:
   - Block-level contribution scores (which feature type matters most?)
   - Visualization helpers (summary plots, force plots, block contribution bars)
 """
+__all__ = ["compute_shap_values", "mean_absolute_shap", "per_class_shap_summary", "block_level_importance", "plot_shap_summary", "plot_block_contributions", "plot_per_class_heatmap", "run_shap_analysis"]
 
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from typing import Literal
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
 
 logger = logging.getLogger(__name__)
 

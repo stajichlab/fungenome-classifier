@@ -8,6 +8,7 @@ Results from block-wise training are used to:
   1. Understand which feature types carry the most signal.
   2. Generate block-level probability vectors for stacking/late fusion.
 """
+__all__ = ["BlockClassifier", "train_all_blocks"]
 
 from __future__ import annotations
 
@@ -80,7 +81,6 @@ class BlockClassifier(BaseEstimator, ClassifierMixin):
                 objective=objective,
                 eval_metric="mlogloss",
                 early_stopping_rounds=self.early_stopping,
-                use_label_encoder=False,
                 random_state=self.random_seed,
                 verbosity=0,
                 n_jobs=-1,

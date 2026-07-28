@@ -7,6 +7,8 @@ name = "fungal-classifier"
 version = "0.1.0"
 description = "Phylogeny-aware multi-feature classifier for fungal genomes"
 requires-python = ">=3.11"
+readme = "README.md"
+authors = [{name = "Jason Stajich"}]
 license = { text = "MIT" }
 
 [project.optional-dependencies]
@@ -22,6 +24,13 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fungal_classifier*"]
+
+[tool.setuptools.package-data]
+fungal_classifier = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
 
 [tool.ruff]
 line-length = 100

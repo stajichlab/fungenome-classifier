@@ -15,6 +15,7 @@ Requires:
 JASPAR fungal PWM download:
     wget https://jaspar.elixir.lu/download/data/2024/CORE/JASPAR2024_CORE_fungi_non-redundant_pfms_meme.txt
 """
+__all__ = ["extract_upstream_sequences", "run_fimo", "parse_fimo_tsv", "fimo_hits_to_enrichment", "build_motif_matrix", "compute_motif_features_for_genome", "build_motif_matrix_from_genomes"]
 
 from __future__ import annotations
 

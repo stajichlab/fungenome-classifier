@@ -7,6 +7,7 @@ Shared preprocessing utilities:
   - Class imbalance strategies (SMOTE, class weights)
   - Label encoding helpers
 """
+__all__ = ["log1p_transform", "clr_transform", "binarize_threshold", "impute_missing", "compute_class_weights", "apply_smote", "encode_labels", "correct_for_genome_size"]
 
 from __future__ import annotations
 
