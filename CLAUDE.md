@@ -5,16 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Environment Setup
 
 ```bash
-# Preferred: conda
-conda env create -f environment.yml
-conda activate fungal-classifier
-pip install -e .
-
-# Alternative: pixi (manages Python 3.11+ and CUDA 12.8)
+# Preferred: pixi (manages Python 3.11+ and CUDA 12.8)
 pixi install
 ```
 
-Dev extras: `pip install -e ".[dev]"` adds pytest, ruff, pre-commit.
+Dev features: `pixi install --features dev` includes pytest, ruff, pre-commit, black, pytest-cov.
 
 ## Commands
 
