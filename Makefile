@@ -1,5 +1,6 @@
 # Makefile — FungalClassifier pipeline orchestration
-# Usage: make help
+# Usage: pixi run make <target>
+# Note: Run inside `pixi run` to ensure scripts use pixi environment
 
 SHELL       := /bin/bash
 PYTHON      := python
@@ -23,7 +24,7 @@ help:
 	@echo ""
 	@echo "FungalClassifier — pipeline targets"
 	@echo "──────────────────────────────────────────────────────"
-	@echo "  make env            Create conda environment"
+	@echo "  make env            Install dependencies with pixi"
 	@echo "  make metadata       Build data/raw/metadata.tsv from taxonomy + FunGuild"
 	@echo "  make features       Build all feature matrices"
 	@echo "  make train          Train XGBoost + stacking (taxonomy_order)"
@@ -39,8 +40,9 @@ help:
 
 # ── environment ────────────────────────────────────────────────────────────────
 env:
-	conda env create -f environment.yml
-	@echo "Activate with: conda activate fungal-classifier"
+	pixi install
+	@echo "Use: pixi run make <target>  # run make inside pixi"
+	@echo "   pixi shell                # enter interactive shell"
 
 SAMPLES     := $(ANNOT_DIR)/taxonomy/samples.csv
 FUNGUILD    := $(ANNOT_DIR)/funguild/species_funguild.csv
